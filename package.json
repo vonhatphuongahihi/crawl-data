@@ -1,0 +1,57 @@
+{
+    "name": "mcp-jira-crawler",
+    "version": "1.0.0",
+    "description": "MCP-based Jira data crawler using MCP Atlassian server",
+    "main": "dist/main.js",
+    "type": "module",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/main.js",
+        "dev": "ts-node --esm src/main.ts",
+        "crawl": "npm run build && npm run start crawl",
+        "crawl:manual": "npm run build && node dist/scripts/manualCrawler.js",
+        "test-connection": "npm run build && npm run start test-connection",
+        "setup-db": "npm run build && npm run start setup-db",
+        "config": "npm run build && npm run start config",
+        "manual": "npm run build && node dist/scripts/manualCrawler.js",
+        "clean": "rm -rf dist",
+        "lint": "eslint src/**/*.ts",
+        "lint:fix": "eslint src/**/*.ts --fix",
+        "quick-start": "npm install && npm run build && echo 'Setup complete! Run: npm run crawl:manual'"
+    },
+    "keywords": [
+        "jira",
+        "mcp",
+        "crawler",
+        "atlassian",
+        "data-extraction",
+        "typescript"
+    ],
+    "author": "Your Name",
+    "license": "MIT",
+    "dependencies": {
+        "commander": "^11.1.0",
+        "dotenv": "^16.3.1",
+        "mysql2": "^3.15.2",
+        "node-fetch": "^3.3.2"
+    },
+    "devDependencies": {
+        "@types/node": "^20.19.20",
+        "@typescript-eslint/eslint-plugin": "^6.15.0",
+        "@typescript-eslint/parser": "^6.15.0",
+        "eslint": "^8.56.0",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.3.3"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/your-username/mcp-jira-crawler.git"
+    },
+    "bugs": {
+        "url": "https://github.com/your-username/mcp-jira-crawler/issues"
+    },
+    "homepage": "https://github.com/your-username/mcp-jira-crawler#readme"
+}
