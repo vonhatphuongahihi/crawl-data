@@ -13,7 +13,7 @@ export const localDatabaseConfig: DatabaseConfig = {
     host: 'localhost',
     port: 3306,
     user: 'root',
-    password: 'password', // Thay đổi theo cấu hình MySQL của bạn
+    password: 'NhatphuongBFF10@', // Thay đổi theo cấu hình MySQL của bạn
     database: 'issue_tracking_db',
     connectionLimit: 10
 };

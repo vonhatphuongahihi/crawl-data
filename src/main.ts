@@ -109,18 +109,29 @@ program
 
 program
     .command('test-connection')
-    .description('Test connection to Jira and database')
-    .requiredOption('-u, --url <url>', 'Jira URL')
-    .requiredOption('-e, --email <email>', 'Jira username/email')
-    .requiredOption('-t, --token <token>', 'Jira API token')
-    .action(async (options) => {
+    .description('Test connection to Jira and database using .env configuration')
+    .action(async () => {
         try {
             console.log('🔌 Testing connections...');
 
+            // Check environment variables
+            const jiraUrl = process.env['JIRA_URL'];
+            const username = process.env['JIRA_USERNAME'];
+            const apiToken = process.env['JIRA_API_TOKEN'];
+
+            if (!jiraUrl || !username || !apiToken) {
+                console.error('❌ Missing required environment variables:');
+                console.error(`   JIRA_URL: ${jiraUrl ? 'Set' : 'Missing'}`);
+                console.error(`   JIRA_USERNAME: ${username ? 'Set' : 'Missing'}`);
+                console.error(`   JIRA_API_TOKEN: ${apiToken ? 'Set' : 'Missing'}`);
+                console.error('💡 Please check your .env file');
+                process.exit(1);
+            }
+
             // Test Jira connection
             console.log('📡 Testing Jira connection...');
-            const { MCPJiraService } = await import('./services/mcpJiraService');
-            const jiraService = new MCPJiraService(options.url, options.email, options.token);
+            const { MCPJiraService } = await import('./services/mcpJiraService.js');
+            const jiraService = new MCPJiraService(jiraUrl, username, apiToken);
 
             await jiraService.connect();
             console.log('✅ Jira connection successful');
@@ -134,7 +145,7 @@ program
 
             // Test database connection
             console.log('🗄️  Testing database connection...');
-            const { DatabaseService } = await import('./services/databaseService');
+            const { DatabaseService } = await import('./services/databaseService.js');
             const dbService = new DatabaseService();
 
             // Test a simple query
