@@ -35,14 +35,16 @@ export class DatabaseService {
         const values = Object.values(data);
         const placeholders = columns.map(() => '?').join(', ');
 
-        const insertQuery = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`;
+        // Wrap column names in backticks to handle MySQL reserved keywords
+        const quotedColumns = columns.map(col => `\`${col}\``).join(', ');
+        const insertQuery = `INSERT INTO ${table} (${quotedColumns}) VALUES (${placeholders})`;
 
         if (updateColumns.length > 0) {
-            const updateClause = updateColumns.map(col => `${col} = VALUES(${col})`).join(', ');
+            const updateClause = updateColumns.map(col => `\`${col}\` = VALUES(\`${col}\`)`).join(', ');
             const query = `${insertQuery} ON DUPLICATE KEY UPDATE ${updateClause}`;
             await connection.execute(query, values);
         } else {
-            const query = `${insertQuery} ON DUPLICATE KEY UPDATE ${columns.map(col => `${col} = VALUES(${col})`).join(', ')}`;
+            const query = `${insertQuery} ON DUPLICATE KEY UPDATE ${columns.map(col => `\`${col}\` = VALUES(\`${col}\`)`).join(', ')}`;
             await connection.execute(query, values);
         }
     }
@@ -157,8 +159,11 @@ export class DatabaseService {
 
             for (const issue of issues) {
                 await this.insertOrUpdate(connection, 'bts_issues', issue, [
-                    'summary', 'status_id', 'assignee_id', 'reporter_id', 'fix_version_id',
-                    'updated', 'time_estimate', 'time_original_estimate', 'custom_fields'
+                    'summary', 'status_id', 'status_name', 'assignee_id', 'assignee_name', 
+                    'reporter_id', 'reporter_name', 'project_key', 'project_name',
+                    'issue_type_id', 'issue_type_name', 'priority_id', 'priority_name',
+                    'updated', 'time_estimate', 'time_original_estimate', 'description',
+                    'labels', 'components', 'fix_versions', 'attachments', 'subtasks'
                 ]);
             }
 

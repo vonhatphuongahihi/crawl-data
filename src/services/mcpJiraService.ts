@@ -11,19 +11,22 @@ export interface JiraProject {
     key: string;
     name: string;
     self: string;
-    projectType?: string;
-    description?: string;
-    lead?: {
-        accountId: string;
-        displayName: string;
+    projectTypeKey?: string; // For company MCP server
+    archived?: boolean; // For company MCP server
+    projectCategory?: { // For company MCP server
+        self: string;
+        id: string;
+        name: string;
+        description?: string;
     };
 }
 
 export interface JiraUser {
-    accountId: string;
-    displayName: string;
+    accountId?: string;
+    displayName?: string;
     emailAddress?: string;
-    active: boolean;
+    active?: boolean;
+    name?: string; // For company MCP server compatibility
 }
 
 export interface JiraIssue {
@@ -92,6 +95,7 @@ export class MCPJiraService extends EventEmitter {
     // private _isConnected = false; // Track connection status
     private requestId = 0;
     private pendingRequests = new Map<number, { resolve: Function; reject: Function }>();
+    private sessionId: string | null = null;
     // private jiraUrl: string;
     // private username: string;
     // private apiToken: string;
@@ -109,53 +113,86 @@ export class MCPJiraService extends EventEmitter {
     }
 
     async connect(): Promise<void> {
-        return new Promise((resolve, reject) => {
-            try {
-                console.log('🔌 Connecting to existing MCP server at localhost:9000...');
+        console.log('🔌 Initializing MCP session...');
 
-                // First, create a session
-                fetch('http://localhost:9000/mcp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json, text/event-stream'
+        const response = await fetch('http://localhost:9000/mcp', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, text/event-stream',
+                'MCP-Protocol-Version': '2024-11-05'
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'initialize',
+                params: {
+                    protocolVersion: '2024-11-05',
+                    capabilities: {
+                        roots: {
+                            listChanged: true
+                        },
+                        sampling: {}
                     },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0',
-                        id: 1,
-                        method: 'initialize',
-                        params: {
-                            protocolVersion: '2024-11-05',
-                            capabilities: {
-                                roots: {
-                                    listChanged: true
-                                },
-                                sampling: {}
-                            },
-                            clientInfo: {
-                                name: 'mcp-jira-crawler',
-                                version: '1.0.0'
-                            }
-                        }
-                    })
-                })
-                    .then(response => {
-                        if (response.ok) {
-                            console.log('✅ Connected to existing MCP server');
-                            resolve();
-                        } else {
-                            throw new Error(`MCP server responded with status: ${response.status}`);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('❌ Failed to connect to MCP server:', error.message);
-                        reject(error);
-                    });
-
-            } catch (error) {
-                reject(error);
-            }
+                    clientInfo: {
+                        name: 'mcp-jira-crawler',
+                        version: '1.0.0'
+                    }
+                }
+            })
         });
+
+        if (!response.ok) {
+            throw new Error(`Failed to initialize session: HTTP ${response.status}`);
+        }
+
+        // Extract session ID from Mcp-Session-Id header (per MCP spec)
+        const mcpSessionIdHeader = response.headers.get('Mcp-Session-Id');
+
+        if (mcpSessionIdHeader) {
+            this.sessionId = mcpSessionIdHeader;
+            console.log(`📋 Extracted session ID from Mcp-Session-Id header: ${this.sessionId}`);
+        } else {
+            // Generate a unique session ID as fallback
+            this.sessionId = `mcp_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            console.log(`📋 Generated fallback session ID: ${this.sessionId}`);
+        }
+
+        console.log(`✅ MCP session initialized: ${this.sessionId}`);
+
+        // Send initialized notification
+        await this.sendInitializedNotification();
+
+        // Wait a bit to ensure initialization is complete
+        console.log('⏳ Waiting for initialization to complete...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('✅ Ready to call tools');
+    }
+
+    // Send initialized notification after initialize
+    private async sendInitializedNotification(): Promise<void> {
+        console.log('📤 Sending initialized notification...');
+
+        const response = await fetch('http://localhost:9000/mcp', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, text/event-stream',
+                'MCP-Protocol-Version': '2024-11-05',
+                'Mcp-Session-Id': this.sessionId || ''
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'notifications/initialized',
+                params: {}
+            })
+        });
+
+        if (response.ok) {
+            console.log('✅ Initialized notification sent');
+        } else {
+            console.log('⚠️ Initialized notification failed, continuing anyway');
+        }
     }
 
     async disconnect(): Promise<void> {
@@ -184,28 +221,94 @@ export class MCPJiraService extends EventEmitter {
                 }
             };
 
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, text/event-stream',
+                'MCP-Protocol-Version': '2024-11-05'
+            };
+
+            // Add session ID if available
+            if (this.sessionId) {
+                headers['Mcp-Session-Id'] = this.sessionId;
+            }
+
             fetch('http://localhost:9000/mcp', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json, text/event-stream'
-                },
+                headers: headers,
                 body: JSON.stringify(requestData)
             })
-                .then(response => response.json())
-                .then((data: any) => {
+                .then(async response => {
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
+                    }
+
+                    // Handle Server-Sent Events response
+                    const responseText = await response.text();
+                    console.log(`📡 Tool ${tool} response:`, responseText.substring(0, 200) + '...');
+
+                    // Try to parse as JSON first
+                    try {
+                        const data: any = JSON.parse(responseText);
+                        if (data.error) {
+                            throw new Error(`MCP Error: ${data.error.message}`);
+                        }
+
+                        // Handle MCP response format: {content: [{type: "text", text: "..."}]}
+                        if (data.result && data.result.content && Array.isArray(data.result.content)) {
+                            const textContent = data.result.content.find((item: any) => item.type === 'text');
+                            if (textContent && textContent.text) {
+                                try {
+                                    const parsedData = JSON.parse(textContent.text);
+                                    return parsedData;
+                                } catch (parseError) {
+                                    return textContent.text;
+                                }
+                            }
+                        }
+
+                        return data.result;
+                    } catch (parseError) {
+                        // If not JSON, try to extract JSON from SSE format
+                        const lines = responseText.split('\n');
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const jsonData = line.substring(6); // Remove 'data: '
+                                    const data: any = JSON.parse(jsonData);
+                                    if (data.error) {
+                                        throw new Error(`MCP Error: ${data.error.message}`);
+                                    }
+
+                                    // Handle MCP response format
+                                    if (data.result && data.result.content && Array.isArray(data.result.content)) {
+                                        const textContent = data.result.content.find((item: any) => item.type === 'text');
+                                        if (textContent && textContent.text) {
+                                            try {
+                                                return JSON.parse(textContent.text);
+                                            } catch (parseError) {
+                                                return textContent.text;
+                                            }
+                                        }
+                                    }
+
+                                    return data.result;
+                                } catch (jsonError) {
+                                    continue;
+                                }
+                            }
+                        }
+                        throw new Error(`Failed to parse MCP response: ${responseText}`);
+                    }
+                })
+                .then((result: any) => {
                     const pendingRequest = this.pendingRequests.get(id);
                     if (pendingRequest) {
                         this.pendingRequests.delete(id);
-
-                        if (data.error) {
-                            pendingRequest.reject(new Error(data.error.message));
-                        } else {
-                            pendingRequest.resolve({
-                                success: true,
-                                data: data.result
-                            });
-                        }
+                        pendingRequest.resolve({
+                            success: true,
+                            data: result
+                        });
                     }
                 })
                 .catch(error => {

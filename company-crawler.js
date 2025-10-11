@@ -1,6 +1,6 @@
-import MCPJiraService from './src/services/mcpJiraService.js';
-import DatabaseService from './src/services/databaseService.js';
-import JiraDataMapper from './src/mappers/jiraDataMapper.js';
+import MCPJiraService from './dist/services/mcpJiraService.js';
+import DatabaseService from './dist/services/databaseService.js';
+import JiraDataMapper from './dist/mappers/jiraDataMapper.js';
 
 let mcpService;
 
@@ -47,10 +47,52 @@ async function crawlCompanyData() {
         });
         console.log(`✅ Found ${projects.length} projects.`);
 
+        // Log project structure để xem data format
+        if (projects.length > 0) {
+            console.log('\n📋 Project structure example (first project):');
+            console.log(JSON.stringify(projects[0], null, 2));
+
+            console.log('\n📋 All project keys:');
+            projects.forEach((project, index) => {
+                console.log(`   ${index + 1}. ${project.key || project.id} - ${project.name || 'No name'}`);
+            });
+
+            // Log một vài project để xem structure
+            console.log('\n📋 Sample projects structure:');
+            projects.slice(0, 3).forEach((project, index) => {
+                console.log(`\n--- Project ${index + 1} ---`);
+                console.log('Keys:', Object.keys(project));
+                console.log('Full data:', JSON.stringify(project, null, 2));
+            });
+        }
+
         const databaseService = new DatabaseService();
         const pageSize = 50;
 
-        // Step 3: Loop through all projects
+        // Step 3: Save all projects first
+        if (projects.length > 0) {
+            console.log('\n💾 Saving all projects to database...');
+            const connection = await databaseService.pool.getConnection();
+            try {
+                await connection.beginTransaction();
+
+                for (const project of projects) {
+                    const mappedProject = JiraDataMapper.mapProject(project);
+                    await databaseService.saveProjects([mappedProject], connection);
+                }
+
+                await connection.commit();
+                console.log(`✅ Saved ${projects.length} projects to database`);
+            } catch (error) {
+                await connection.rollback();
+                console.error('❌ Failed to save projects:', error);
+                throw error;
+            } finally {
+                connection.release();
+            }
+        }
+
+        // Step 4: Loop through all projects to crawl issues
         for (const project of projects) {
             console.log(`\n🚀 Crawling project ${project.key} (${project.name})...`);
             let startAt = 0;
@@ -82,6 +124,12 @@ async function crawlCompanyData() {
                         console.log(JSON.stringify(detailedIssue, null, 2));
 
                         const mappedData = JiraDataMapper.extractAllEntities(detailedIssue);
+
+                        // Fix project_id in issue to use real project ID from database
+                        mappedData.issue.project_id = project.id;
+                        mappedData.issue.project_key = project.key;
+                        mappedData.issue.project_name = project.name;
+
                         console.log(`🧭 Mapped data for ${issue.key}:`);
                         console.log(JSON.stringify(mappedData, null, 2));
 
@@ -92,7 +140,14 @@ async function crawlCompanyData() {
                             if (mappedData.users.length) {
                                 await databaseService.saveUsers(mappedData.users, connection);
                             }
-                            await databaseService.saveProjects([mappedData.project], connection);
+                            // Don't save project here - already saved in Step 3 with full info
+                            // await databaseService.saveProjects([mappedData.project], connection);
+
+                            // Save status before issues to avoid foreign key constraint
+                            if (mappedData.status) {
+                                await databaseService.saveStatuses([mappedData.status], connection);
+                            }
+
                             await databaseService.saveIssues([mappedData.issue], connection);
 
                             console.log("💾 Ready to commit these to DB:");

@@ -14,9 +14,12 @@ export interface DatabaseProject {
     key: string;
     name: string;
     self: string;
-    project_type?: string;
-    description?: string;
-    lead_account_id?: string;
+    project_type_key?: string;
+    archived?: boolean;
+    project_category_self?: string;
+    project_category_id?: string;
+    project_category_name?: string;
+    project_category_description?: string;
 }
 
 export interface DatabaseStatus {
@@ -51,16 +54,29 @@ export interface DatabaseIssue {
     self: string;
     summary: string;
     status_id: string;
+    status_name?: string;
     project_id: string;
+    project_key?: string;
+    project_name?: string;
     assignee_id?: string;
+    assignee_name?: string;
     reporter_id?: string;
-    fix_version_id?: string;
+    reporter_name?: string;
+    issue_type_id?: string;
+    issue_type_name?: string;
+    priority_id?: string;
+    priority_name?: string;
     created: Date;
     updated: Date;
     time_estimate?: number;
     time_original_estimate?: number;
     resolved_date: Date;
-    custom_fields: string; // JSON string
+    description?: string;
+    labels?: string; // JSON string
+    components?: string; // JSON string
+    fix_versions?: string; // JSON string
+    attachments?: string; // JSON string
+    subtasks?: string; // JSON string
 }
 
 export interface DatabaseChangelog {
@@ -89,20 +105,26 @@ export interface DatabaseIssueFixVersion {
 }
 
 export class JiraDataMapper {
+    // Helper function to convert undefined to null for MySQL compatibility
+    private static nullify(value: any): any {
+        return value === undefined ? null : value;
+    }
 
     // Map Jira user to database user
     static mapUser(jiraUser: JiraUser, userId?: string): DatabaseUser {
-        const result: DatabaseUser = {
-            id: jiraUser.accountId || `user_${Date.now()}`,
-            user_id: userId || jiraUser.accountId || `user_${Date.now()}`,
-            account_id: jiraUser.accountId,
-            display_name: jiraUser.displayName,
-            active: jiraUser.active
-        };
+        // Handle company MCP server format where accountId might be null but name/email exist
+        const userIdentifier = jiraUser.accountId || jiraUser.name || `user_${Date.now()}`;
+        const userEmail = jiraUser.emailAddress || (jiraUser as any).email;
+        const userDisplayName = jiraUser.displayName || jiraUser.name;
 
-        if (jiraUser.emailAddress) {
-            result.email_address = jiraUser.emailAddress;
-        }
+        const result: DatabaseUser = {
+            id: this.nullify(userIdentifier),
+            user_id: this.nullify(userId) || this.nullify(userIdentifier),
+            account_id: this.nullify(jiraUser.accountId),
+            display_name: this.nullify(userDisplayName),
+            email_address: this.nullify(userEmail),
+            active: this.nullify(jiraUser.active)
+        };
 
         return result;
     }
@@ -110,21 +132,17 @@ export class JiraDataMapper {
     // Map Jira project to database project
     static mapProject(jiraProject: JiraProject): DatabaseProject {
         const result: DatabaseProject = {
-            id: jiraProject.id,
-            key: jiraProject.key,
-            name: jiraProject.name,
-            self: jiraProject.self
+            id: this.nullify(jiraProject.id),
+            key: this.nullify(jiraProject.key),
+            name: this.nullify(jiraProject.name),
+            self: this.nullify(jiraProject.self),
+            project_type_key: this.nullify(jiraProject.projectTypeKey),
+            archived: jiraProject.archived ?? false,
+            project_category_self: this.nullify(jiraProject.projectCategory?.self),
+            project_category_id: this.nullify(jiraProject.projectCategory?.id),
+            project_category_name: this.nullify(jiraProject.projectCategory?.name),
+            project_category_description: this.nullify(jiraProject.projectCategory?.description)
         };
-
-        if (jiraProject.projectType) {
-            result.project_type = jiraProject.projectType;
-        }
-        if (jiraProject.description) {
-            result.description = jiraProject.description;
-        }
-        if (jiraProject.lead?.accountId) {
-            result.lead_account_id = jiraProject.lead.accountId;
-        }
 
         return result;
     }
@@ -132,10 +150,11 @@ export class JiraDataMapper {
     // Map Jira issue status to database status
     static mapStatus(jiraStatus: any): DatabaseStatus {
         return {
-            id: jiraStatus.id,
-            name: jiraStatus.name,
-            description: jiraStatus.description,
-            status_category: JSON.stringify(jiraStatus.statusCategory || {})
+            // Use name as id if id is null (for company MCP server compatibility)
+            id: this.nullify(jiraStatus.id || jiraStatus.name),
+            name: this.nullify(jiraStatus.name),
+            description: this.nullify(jiraStatus.description),
+            status_category: this.nullify(JSON.stringify(jiraStatus.statusCategory || {}))
         };
     }
 
@@ -207,16 +226,31 @@ export class JiraDataMapper {
         const resolvedDate = new Date(fields.updated || jiraIssue.updated); // Use updated as resolved date
 
         const result: DatabaseIssue = {
-            id: jiraIssue.id,
-            key: jiraIssue.key,
-            self: jiraIssue.self || jiraIssue.url,
-            summary: fields.summary || jiraIssue.summary || '',
-            status_id: fields.status?.id || fields.status?.name || 'unknown',
-            project_id: fields.project?.id || 'unknown',
+            id: this.nullify(jiraIssue.id),
+            key: this.nullify(jiraIssue.key),
+            self: this.nullify(jiraIssue.self || jiraIssue.url),
+            summary: this.nullify(fields.summary || jiraIssue.summary || ''),
+            // Use name as id if id is null (for company MCP server compatibility)
+            status_id: this.nullify(fields.status?.id || fields.status?.name || 'unknown'),
+            status_name: this.nullify(fields.status?.name),
+            project_id: this.nullify(fields.project?.id || 'unknown'),
+            project_key: this.nullify(fields.project?.key),
+            project_name: this.nullify(fields.project?.name),
             created,
             updated,
             resolved_date: resolvedDate,
-            custom_fields: JSON.stringify(customFields)
+            description: this.nullify(fields.description),
+            // Use name as id if id is null (for company MCP server compatibility)
+            issue_type_id: this.nullify(fields.issuetype?.id || fields.issue_type?.id || fields.issuetype?.name || fields.issue_type?.name),
+            issue_type_name: this.nullify(fields.issuetype?.name || fields.issue_type?.name),
+            // Use name as id if id is null (for company MCP server compatibility)
+            priority_id: this.nullify(fields.priority?.id || fields.priority?.name),
+            priority_name: this.nullify(fields.priority?.name),
+            labels: this.nullify(JSON.stringify(fields.labels || [])),
+            components: this.nullify(JSON.stringify(fields.components || [])),
+            fix_versions: this.nullify(JSON.stringify(fields.fixVersions || [])),
+            attachments: this.nullify(JSON.stringify(fields.attachments || [])),
+            subtasks: this.nullify(JSON.stringify(fields.subtasks || []))
         };
 
         if (timeEstimate !== undefined) {
@@ -227,14 +261,14 @@ export class JiraDataMapper {
         }
 
         if (fields.assignee?.accountId || fields.assignee?.name) {
-            result.assignee_id = fields.assignee.accountId || fields.assignee.name;
+            result.assignee_id = this.nullify(fields.assignee.accountId || fields.assignee.name);
+            result.assignee_name = this.nullify(fields.assignee.display_name);
         }
         if (fields.reporter?.accountId || fields.reporter?.name) {
-            result.reporter_id = fields.reporter.accountId || fields.reporter.name;
+            result.reporter_id = this.nullify(fields.reporter.accountId || fields.reporter.name);
+            result.reporter_name = this.nullify(fields.reporter.display_name);
         }
-        if (fields.fixVersions?.[0]?.id) {
-            result.fix_version_id = fields.fixVersions[0].id;
-        }
+        // fix_versions is already handled as JSON field above
 
         return result;
     }
@@ -295,7 +329,8 @@ export class JiraDataMapper {
             issue: this.mapIssue(jiraIssue),
             labels: this.mapLabels(jiraIssue),
             components: this.mapIssueComponents(jiraIssue),
-            issueFixVersions: this.mapIssueFixVersions(jiraIssue)
+            issueFixVersions: this.mapIssueFixVersions(jiraIssue),
+            status: null as DatabaseStatus | null
         };
 
         // Handle both formats: with fields wrapper and without
@@ -318,24 +353,39 @@ export class JiraDataMapper {
                 key: fields.project.key,
                 name: fields.project.name,
                 self: (fields.project as any).self || fields.project.id,
-                projectType: (fields.project as any).projectType,
-                description: (fields.project as any).description,
-                lead: (fields.project as any).lead
+                projectTypeKey: (fields.project as any).projectTypeKey,
+                archived: (fields.project as any).archived,
+                projectCategory: (fields.project as any).projectCategory
             };
             project = this.mapProject(projectData);
         } else {
-            // Create minimal project if not available
+            // Extract project key from issue key (e.g., "ADVANCED_A-112" -> "ADVANCED_A")
+            const issueKey = jiraIssue.key || '';
+            const projectKey = issueKey.split('-')[0] || 'unknown';
+
+            // Create project with extracted key - this will be updated when projects are saved
             project = {
-                id: 'unknown',
-                key: 'unknown',
-                name: 'Unknown Project',
-                self: 'unknown',
-                project_type: 'unknown'
+                id: projectKey, // Use project key as id since we don't have real project id
+                key: projectKey,
+                name: `${projectKey} Project`, // Generic name since we don't have real project name
+                self: projectKey,
+                project_type_key: 'unknown',
+                archived: false
             };
         }
 
         // Extract status
-        const status = this.mapStatus(fields.status || { id: 'unknown', name: 'Unknown', category: 'Unknown' });
+        if (fields.status) {
+            entities.status = this.mapStatus(fields.status);
+        } else {
+            // Create a default status if none exists
+            entities.status = {
+                id: 'unknown',
+                name: 'Unknown Status',
+                description: 'Unknown status',
+                status_category: '{}'
+            };
+        }
 
         // Extract fix versions
         const fixVersions = (fields.fixVersions || []).map((fv: any) =>
@@ -346,7 +396,7 @@ export class JiraDataMapper {
             ...entities,
             users,
             project,
-            status,
+            status: entities.status,
             fixVersions
         };
     }

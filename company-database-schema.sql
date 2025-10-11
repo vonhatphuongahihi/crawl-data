@@ -29,13 +29,17 @@ CREATE TABLE bts_projects (
     `key` VARCHAR(50) NOT NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
     self VARCHAR(500),
-    project_type VARCHAR(100),
-    description TEXT,
-    lead_account_id VARCHAR(255),
+    project_type_key VARCHAR(100),
+    archived BOOLEAN DEFAULT FALSE,
+    project_category_self VARCHAR(500),
+    project_category_id VARCHAR(255),
+    project_category_name VARCHAR(255),
+    project_category_description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_key (`key`),
-    INDEX idx_name (name)
+    INDEX idx_name (name),
+    INDEX idx_project_category_id (project_category_id)
 );
 
 -- Users table
