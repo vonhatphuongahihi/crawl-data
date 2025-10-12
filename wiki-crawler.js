@@ -164,15 +164,31 @@ async function crawlWikiData() {
                     try {
                         console.log(`\n📦 Processing page: ${wikiPage.title} (${wikiPage.id})`);
 
-                        // Get detailed page info
+                        // Get detailed page info with version and history expanded to get user info
                         const detailedPage = await callMCPTool('confluence_get_page', {
                             page_id: wikiPage.id,
                             include_metadata: true,
-                            convert_to_markdown: false
+                            convert_to_markdown: false,
+                            expand: 'version,history,space'  // Try to expand version and history for user info
                         });
 
                         console.log(`📦 Raw page data from MCP for ${wikiPage.id}:`);
                         console.log(JSON.stringify(detailedPage, null, 2));
+
+                        // Debug: Check if expand worked
+                        console.log(`🔍 EXPAND DEBUG for ${wikiPage.id}:`);
+                        console.log(`   - detailedPage.version:`, detailedPage.version);
+                        console.log(`   - detailedPage.history:`, detailedPage.history);
+                        console.log(`   - detailedPage.space:`, detailedPage.space);
+                        if (detailedPage.version) {
+                            console.log(`   - version.by:`, detailedPage.version.by);
+                            console.log(`   - version.number:`, detailedPage.version.number);
+                            console.log(`   - version.when:`, detailedPage.version.when);
+                        }
+                        if (detailedPage.history) {
+                            console.log(`   - history.createdBy:`, detailedPage.history.createdBy);
+                            console.log(`   - history.createdDate:`, detailedPage.history.createdDate);
+                        }
 
                         // Debug: Check detailedPage structure first
                         console.log(`🔍 detailedPage structure for ${wikiPage.id}:`);
@@ -181,14 +197,92 @@ async function crawlWikiData() {
                         console.log(`   - metadata.title:`, detailedPage.metadata?.title);
                         console.log(`   - metadata.url:`, detailedPage.metadata?.url);
                         console.log(`   - metadata.space:`, detailedPage.metadata?.space);
+                        console.log(`   - Full metadata keys:`, Object.keys(detailedPage.metadata || {}));
+                        console.log(`   - Has history/version info:`, !!detailedPage.metadata?.history);
+                        console.log(`   - Has author info:`, !!detailedPage.metadata?.author);
+                        console.log(`   - Has version info:`, !!detailedPage.metadata?.version);
+                        console.log(`   - Has creator info:`, !!detailedPage.metadata?.creator);
+                        console.log(`   - Has history info:`, !!detailedPage.history);
+                        console.log(`   - Has version.by info:`, !!detailedPage.version?.by);
+                        console.log(`   - Has history.createdBy info:`, !!detailedPage.history?.createdBy);
+                        console.log(`   - Full detailedPage keys:`, Object.keys(detailedPage || {}));
+
+                        // Transform MCP response to expected format for mapper
+                        const transformedPage = {
+                            id: detailedPage.metadata?.id,
+                            title: detailedPage.metadata?.title,
+                            url: detailedPage.metadata?.url,
+                            type: detailedPage.metadata?.type,
+                            status: 'current',
+                            space: detailedPage.metadata?.space,
+                            version: {
+                                number: detailedPage.metadata?.version,
+                                by: {
+                                    // Try to get user info from version.by or history.createdBy
+                                    displayName: detailedPage.version?.by?.displayName ||
+                                        detailedPage.history?.createdBy?.displayName ||
+                                        'Unknown User',
+                                    accountId: detailedPage.version?.by?.accountId ||
+                                        detailedPage.history?.createdBy?.accountId ||
+                                        null,
+                                    accountType: detailedPage.version?.by?.accountType ||
+                                        detailedPage.history?.createdBy?.accountType ||
+                                        'atlassian',
+                                    email: detailedPage.version?.by?.email ||
+                                        detailedPage.history?.createdBy?.email ||
+                                        null,
+                                    publicName: detailedPage.version?.by?.publicName ||
+                                        detailedPage.history?.createdBy?.publicName ||
+                                        'Unknown User',
+                                    userKey: detailedPage.version?.by?.userKey ||
+                                        detailedPage.history?.createdBy?.userKey ||
+                                        null,
+                                    profilePicture: detailedPage.version?.by?.profilePicture ||
+                                        detailedPage.history?.createdBy?.profilePicture ||
+                                        null,
+                                    isExternalCollaborator: detailedPage.version?.by?.isExternalCollaborator ||
+                                        detailedPage.history?.createdBy?.isExternalCollaborator ||
+                                        false,
+                                    isGuest: detailedPage.version?.by?.isGuest ||
+                                        detailedPage.history?.createdBy?.isGuest ||
+                                        false,
+                                    locale: detailedPage.version?.by?.locale ||
+                                        detailedPage.history?.createdBy?.locale ||
+                                        'en',
+                                    accountStatus: detailedPage.version?.by?.accountStatus ||
+                                        detailedPage.history?.createdBy?.accountStatus ||
+                                        'active'
+                                },
+                                when: detailedPage.metadata?.created || detailedPage.metadata?.lastModified || null
+                            },
+                            _links: {
+                                webui: detailedPage.metadata?.url
+                            }
+                        };
+
+                        console.log(`🔧 Transformed page for ${wikiPage.id}:`);
+                        console.log(`   - id:`, transformedPage.id);
+                        console.log(`   - title:`, transformedPage.title);
+                        console.log(`   - url:`, transformedPage.url);
+                        console.log(`   - version.by.displayName:`, transformedPage.version?.by?.displayName);
+                        console.log(`   - version.by.userKey:`, transformedPage.version?.by?.userKey);
+                        console.log(`   - version.by.email:`, transformedPage.version?.by?.email);
 
                         // Extract all entities from the page
-                        const mappedData = WikiDataMapper.extractAllEntities(detailedPage);
+                        const mappedData = WikiDataMapper.extractAllEntities(transformedPage);
 
                         console.log(`🧭 Mapped data for ${wikiPage.id}:`);
                         console.log(`   - page:`, mappedData.page ? 'defined' : 'undefined');
                         console.log(`   - users:`, mappedData.users?.length || 0);
                         console.log(`   - space:`, mappedData.space ? 'defined' : 'undefined');
+
+                        // Debug: Check mappedData.page content
+                        if (mappedData.page) {
+                            console.log(`   - page.id:`, mappedData.page.page_id);
+                            console.log(`   - page.title:`, mappedData.page.title);
+                        } else {
+                            console.log(`   ❌ mappedData.page is undefined!`);
+                        }
 
                         // Get additional data if needed
                         let labels = [];
@@ -220,7 +314,7 @@ async function crawlWikiData() {
                         const allEntities = {
                             users: mappedData.users,
                             spaces: mappedData.space ? [mappedData.space] : [],
-                            pages: [mappedData.page],
+                            pages: mappedData.page ? [mappedData.page] : [], // Fix: check if page exists
                             views: mappedData.views,
                             contributors: mappedData.contributors,
                             visitHistories: [],
