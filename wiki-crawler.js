@@ -63,12 +63,20 @@ async function crawlWikiData() {
             limit: 50  // Smaller limit to avoid MCP errors
         });
 
-        // Extract unique spaces from search results
+        // Extract unique spaces from search results (only English spaces)
         const spaceMap = new Map();
         if (searchResult.results) {
             searchResult.results.forEach(result => {
                 if (result.space) {  // Fix: space is at result level, not result.content
                     const space = result.space;
+
+                    // Filter out Korean spaces - only keep English spaces
+                    const hasKorean = /[가-힣]/.test(space.name);
+                    if (hasKorean) {
+                        console.log(`🚫 Skipping Korean space: ${space.key} - ${space.name}`);
+                        return;
+                    }
+
                     spaceMap.set(space.key, {
                         id: 0, // Default ID
                         key: space.key,
@@ -81,22 +89,22 @@ async function crawlWikiData() {
         }
 
         const spaces = Array.from(spaceMap.values());
-        console.log(`✅ Found ${spaces.length} spaces.`);
+        console.log(`✅ Found ${spaces.length} English-only spaces (Korean spaces filtered out).`);
 
         // Log space structure để xem data format
         if (spaces.length > 0) {
             console.log('\n📋 Space structure example (first space):');
             console.log(JSON.stringify(spaces[0], null, 2));
 
-            console.log('\n📋 All space keys:');
+            console.log('\n📋 All English space keys:');
             spaces.forEach((space, index) => {
                 console.log(`   ${index + 1}. ${space.key} - ${space.name}`);
             });
         }
 
-        // Use all spaces found (no filtering needed)
-        const filteredSpaces = spaces; // Use all spaces found by MCP
-        console.log(`📊 Processing all ${filteredSpaces.length} spaces found`);
+        // Use only English spaces (Korean spaces already filtered out)
+        const filteredSpaces = spaces; // Already filtered for English-only
+        console.log(`📊 Processing ${filteredSpaces.length} English spaces only`);
 
         // Step 3: Save all filtered spaces first
         if (filteredSpaces.length > 0) {
