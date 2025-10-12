@@ -334,10 +334,16 @@ async function crawlWikiData() {
                             await databaseService.saveUsers(allEntities.users);
                             await databaseService.saveSpaces(allEntities.spaces);
 
-                            // Get user map to link created_by_id
+                            // Get user map to link created_by_id (AFTER saving users)
                             const userMap = await databaseService.getUserIdsByUserKeys(
                                 allEntities.users.map(u => u.user_key)
                             );
+
+                            console.log(`🔍 User map after saving:`, {
+                                userKeys: allEntities.users.map(u => u.user_key),
+                                userMapSize: userMap.size,
+                                userMapEntries: Array.from(userMap.entries())
+                            });
 
                             // Update pages with created_by_id
                             const validPages = allEntities.pages.filter(p => p !== undefined);
@@ -347,13 +353,17 @@ async function crawlWikiData() {
                                     if (mappedData.users && mappedData.users.length > 0) {
                                         const creator = mappedData.users[0];
                                         const createdById = userMap.get(creator.user_key);
+
                                         console.log(`🔗 Linking page ${page.page_id} to user:`, {
                                             userKey: creator.user_key,
                                             userId: creator.user_id,
                                             createdById: createdById,
-                                            userMapSize: userMap.size
+                                            userMapSize: userMap.size,
+                                            allUserKeys: Array.from(userMap.keys())
                                         });
-                                        page.created_by_id = createdById;
+
+                                        // Use null instead of undefined for SQL
+                                        page.created_by_id = createdById || null;
                                     }
                                 }
                                 await databaseService.savePages(validPages);

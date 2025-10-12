@@ -58,8 +58,8 @@ class HistoryMixin(ConfluenceClient):
         """
         try:
             # Get page with history expanded like api.ts line 110
-            page_data = self.confluence.get_content_by_id(
-                content_id=page_id,
+            page_data = self.confluence.get_page_by_id(
+                page_id=page_id,
                 expand="history"
             )
             
