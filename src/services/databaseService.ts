@@ -49,6 +49,31 @@ export class DatabaseService {
         }
     }
 
+    // Insert or update with IGNORE (for unique constraints)
+    private async insertOrUpdateIgnore(
+        connection: any,
+        table: string,
+        data: any,
+        updateColumns: string[] = []
+    ): Promise<void> {
+        const columns = Object.keys(data);
+        const values = Object.values(data);
+        const placeholders = columns.map(() => '?').join(', ');
+
+        // Wrap column names in backticks to handle MySQL reserved keywords
+        const quotedColumns = columns.map(col => `\`${col}\``).join(', ');
+        const insertQuery = `INSERT IGNORE INTO ${table} (${quotedColumns}) VALUES (${placeholders})`;
+
+        if (updateColumns.length > 0) {
+            const updateClause = updateColumns.map(col => `\`${col}\` = VALUES(\`${col}\`)`).join(', ');
+            const query = `${insertQuery} ON DUPLICATE KEY UPDATE ${updateClause}`;
+            await connection.execute(query, values);
+        } else {
+            const query = `${insertQuery} ON DUPLICATE KEY UPDATE ${columns.map(col => `\`${col}\` = VALUES(\`${col}\`)`).join(', ')}`;
+            await connection.execute(query, values);
+        }
+    }
+
     // Save users
     async saveUsers(users: DatabaseUser[]): Promise<void> {
         if (users.length === 0) return;
@@ -58,8 +83,14 @@ export class DatabaseService {
             await connection.beginTransaction();
 
             for (const user of users) {
-                await this.insertOrUpdate(connection, 'bts_users', user, [
-                    'account_id', 'display_name', 'email_address', 'active'
+                // Skip if user has no identifying information
+                if (!user.email_address && !user.display_name) {
+                    console.log('Skipping user with no identifying information:', user);
+                    continue;
+                }
+
+                await this.insertOrUpdateIgnore(connection, 'bts_users', user, [
+                    'display_name', 'email_address', 'active'
                 ]);
             }
 

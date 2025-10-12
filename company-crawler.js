@@ -104,6 +104,10 @@ async function crawlCompanyData() {
             console.log('\n💾 Saving all filtered projects to database...');
             const connection = await databaseService.pool.getConnection();
             try {
+                // Set timeout for this connection
+                await connection.execute('SET SESSION wait_timeout = 28800'); // 8 hours
+                await connection.execute('SET SESSION interactive_timeout = 28800'); // 8 hours
+
                 await connection.beginTransaction();
 
                 for (const project of filteredProjects) {
@@ -114,11 +118,19 @@ async function crawlCompanyData() {
                 await connection.commit();
                 console.log(`✅ Saved ${filteredProjects.length} projects to database`);
             } catch (error) {
-                await connection.rollback();
                 console.error('❌ Failed to save projects:', error);
+                try {
+                    await connection.rollback();
+                } catch (rollbackErr) {
+                    console.error('❌ Rollback failed:', rollbackErr);
+                }
                 throw error;
             } finally {
-                connection.release();
+                try {
+                    connection.release();
+                } catch (releaseErr) {
+                    console.error('❌ Connection release failed:', releaseErr);
+                }
             }
         }
 
@@ -165,6 +177,10 @@ async function crawlCompanyData() {
 
                         const connection = await databaseService.pool.getConnection();
                         try {
+                            // Set timeout for this connection
+                            await connection.execute('SET SESSION wait_timeout = 28800'); // 8 hours
+                            await connection.execute('SET SESSION interactive_timeout = 28800'); // 8 hours
+
                             await connection.beginTransaction();
 
                             if (mappedData.users.length) {
@@ -185,10 +201,18 @@ async function crawlCompanyData() {
                             await connection.commit();
                             console.log(`   ✅ Saved issue ${issue.key}`);
                         } catch (err) {
-                            await connection.rollback();
                             console.error(`   ❌ Failed to process issue ${issue.key}:`, err);
+                            try {
+                                await connection.rollback();
+                            } catch (rollbackErr) {
+                                console.error(`   ❌ Rollback failed:`, rollbackErr);
+                            }
                         } finally {
-                            connection.release();
+                            try {
+                                connection.release();
+                            } catch (releaseErr) {
+                                console.error(`   ❌ Connection release failed:`, releaseErr);
+                            }
                         }
                     } catch (err) {
                         console.error(`   ❌ Failed to process issue ${issue.key}:`, err);
