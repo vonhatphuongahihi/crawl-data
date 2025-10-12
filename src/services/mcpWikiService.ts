@@ -751,6 +751,38 @@ export class MCPWikiService extends EventEmitter {
         return response.data;
     }
 
+    // Get page versions (for contributors)
+    async getPageVersionsForContributors(pageId: string): Promise<any> {
+        console.log(`📚 Getting page versions for contributors: ${pageId}...`);
+
+        const response = await this.makeRequest('confluence_get_page_versions', {
+            page_id: pageId
+        });
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to get page versions');
+        }
+
+        console.log(`✅ Page versions retrieved for ${pageId}`);
+        return response.data;
+    }
+
+    // Get page views count
+    async getPageViewsCount(pageId: string): Promise<any> {
+        console.log(`👀 Getting page views count for ${pageId}...`);
+
+        const response = await this.makeRequest('confluence_get_page_views', {
+            page_id: pageId
+        });
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to get page views');
+        }
+
+        console.log(`✅ Page views retrieved for ${pageId}`);
+        return response.data;
+    }
+
     // Get all spaces (using search with CQL) - with pagination
     async getAllSpaces(limit: number = 50): Promise<WikiSpace[]> {
         try {

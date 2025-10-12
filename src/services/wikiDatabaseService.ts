@@ -47,12 +47,11 @@ export class WikiDatabaseService {
         }
     }
 
-    // Insert or update with IGNORE (for unique constraints)
-    private async insertOrUpdateIgnore(
+    // Insert with IGNORE (for unique constraints) - no updates
+    private async insertIgnore(
         connection: PoolConnection,
         table: string,
-        data: any,
-        updateColumns: string[] = []
+        data: any
     ): Promise<void> {
         const columns = Object.keys(data);
         const values = Object.values(data);
@@ -60,19 +59,12 @@ export class WikiDatabaseService {
 
         // Wrap column names in backticks to handle MySQL reserved keywords
         const quotedColumns = columns.map(col => `\`${col}\``).join(', ');
-        const insertQuery = `INSERT IGNORE INTO ${table} (${quotedColumns}) VALUES (${placeholders})`;
+        const query = `INSERT IGNORE INTO ${table} (${quotedColumns}) VALUES (${placeholders})`;
 
-        if (updateColumns.length > 0) {
-            const updateClause = updateColumns.map(col => `\`${col}\` = VALUES(\`${col}\`)`).join(', ');
-            const query = `${insertQuery} ON DUPLICATE KEY UPDATE ${updateClause}`;
-            await connection.execute(query, values);
-        } else {
-            const query = `${insertQuery} ON DUPLICATE KEY UPDATE ${columns.map(col => `\`${col}\` = VALUES(\`${col}\`)`).join(', ')}`;
-            await connection.execute(query, values);
-        }
+        await connection.execute(query, values);
     }
 
-    // Save users
+    // Save users (INSERT IGNORE - only insert new users, don't update existing)
     async saveUsers(users: WikiUserData[]): Promise<void> {
         if (users.length === 0) return;
 
@@ -87,13 +79,12 @@ export class WikiDatabaseService {
                     continue;
                 }
 
-                await this.insertOrUpdateIgnore(connection, 'wiki_users', user, [
-                    'display_name', 'avatar_url', 'roles', 'english_name', 'is_resigned'
-                ]);
+                // Use INSERT IGNORE to avoid overwriting existing users
+                await this.insertIgnore(connection, 'wiki_users', user);
             }
 
             await connection.commit();
-            console.log(`Saved ${users.length} users to database`);
+            console.log(`Saved ${users.length} users to database (INSERT IGNORE)`);
         } catch (error) {
             await connection.rollback();
             console.error('Error saving users:', error);

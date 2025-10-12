@@ -192,6 +192,33 @@ async function crawlWikiData() {
                             console.warn(`⚠️ Could not get page creator for ${wikiPage.id}:`, creatorError);
                         }
 
+                        // Get page views count using NEW MCP tool
+                        let pageViews = null;
+                        try {
+                            pageViews = await mcpService.getPageViewsCount(wikiPage.id);
+                            console.log(`👀 Page views from NEW MCP tool:`, JSON.stringify(pageViews, null, 2));
+                        } catch (viewsError) {
+                            console.warn(`⚠️ Could not get page views for ${wikiPage.id}:`, viewsError);
+                        }
+
+                        // Get page versions for contributors using NEW MCP tool
+                        let pageVersions = null;
+                        try {
+                            pageVersions = await mcpService.getPageVersionsForContributors(wikiPage.id);
+                            console.log(`📚 Page versions from NEW MCP tool:`, JSON.stringify(pageVersions, null, 2));
+                        } catch (versionsError) {
+                            console.warn(`⚠️ Could not get page versions for ${wikiPage.id}:`, versionsError);
+                        }
+
+                        // Get visit history using NEW MCP tool
+                        let visitHistory = null;
+                        try {
+                            visitHistory = await mcpService.getVisitHistory(wikiPage.id);
+                            console.log(`📊 Visit history from NEW MCP tool:`, JSON.stringify(visitHistory, null, 2));
+                        } catch (historyError) {
+                            console.warn(`⚠️ Could not get visit history for ${wikiPage.id}:`, historyError);
+                        }
+
                         // Debug: Check if expand worked
                         console.log(`🔍 EXPAND DEBUG for ${wikiPage.id}:`);
                         console.log(`   - detailedPage.version:`, detailedPage.version);
