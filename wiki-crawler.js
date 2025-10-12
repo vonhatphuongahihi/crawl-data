@@ -414,12 +414,30 @@ async function crawlWikiData() {
                                 console.log(`📊 Visit history by user name for ${wikiPage.id}:`, JSON.stringify(visitHistoryByUserName, null, 2));
 
                                 if (visitHistoryByUserName && typeof visitHistoryByUserName === 'object') {
-                                    const userNames = Object.keys(visitHistoryByUserName);
+                                    // Handle case where MCP tool returns {results: [...]} instead of {username: [...]}
+                                    let userNames;
+                                    if (visitHistoryByUserName.results && Array.isArray(visitHistoryByUserName.results)) {
+                                        // Extract usernames from results array
+                                        userNames = visitHistoryByUserName.results.map(result => result.username || result.userKey).filter(Boolean);
+                                    } else {
+                                        // Normal case: {username: visits[]}
+                                        userNames = Object.keys(visitHistoryByUserName);
+                                    }
                                     console.log(`👥 Found ${userNames.length} users with visit history:`, userNames);
 
                                     // Step 2: Create views for each user (like storeWikiViews in api.ts)
                                     const viewPromises = userNames.map(async (username) => {
-                                        const userVisits = visitHistoryByUserName[username];
+                                        // Handle different response structures
+                                        let userVisits;
+                                        if (visitHistoryByUserName.results && Array.isArray(visitHistoryByUserName.results)) {
+                                            // Find visits for this username in results array
+                                            userVisits = visitHistoryByUserName.results.filter(result =>
+                                                (result.username || result.userKey) === username
+                                            );
+                                        } else {
+                                            // Normal case: userVisits = visitHistoryByUserName[username]
+                                            userVisits = visitHistoryByUserName[username];
+                                        }
                                         if (!userVisits || !Array.isArray(userVisits)) return null;
 
                                         // Get user info (try to find existing user or create new one)

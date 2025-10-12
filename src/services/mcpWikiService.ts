@@ -12,6 +12,8 @@ export interface WikiPage {
     status: string;
     title: string;
     url?: string; // Full URL returned by MCP tools
+    created?: string; // Page creation timestamp
+    updated?: string; // Page last update timestamp
     space?: {
         id: number;
         key: string;
@@ -700,8 +702,8 @@ export class MCPWikiService extends EventEmitter {
         return response.data;
     }
 
-    // Get all versions of a page
-    async getPageVersions(pageId: string): Promise<any> {
+    // Get all versions of a page (legacy method)
+    async getPageVersionsLegacy(pageId: string): Promise<any> {
         console.log(`📚 Getting page versions for ${pageId}...`);
 
         const response = await this.makeRequest('confluence_get_page_versions', {
@@ -843,6 +845,43 @@ export class MCPWikiService extends EventEmitter {
     }
 
     // Health check
+    // Get all versions of a page
+    async getPageVersions(pageId: string, start: number = 0, limit: number = 25): Promise<any> {
+        console.log(`📚 Getting page versions for ${pageId}...`);
+
+        const response = await this.makeRequest('confluence_get_page_versions', {
+            page_id: pageId,
+            start: start,
+            limit: limit
+        });
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to get page versions');
+        }
+
+        console.log(`✅ Page versions retrieved for ${pageId}`);
+        console.log(`📚 Page versions data:`, JSON.stringify(response.data, null, 2));
+
+        return response.data;
+    }
+
+    // Get specific version details
+    async getPageVersionDetails(pageId: string, versionNumber: number): Promise<any> {
+        console.log(`📖 Getting version ${versionNumber} details for ${pageId}...`);
+
+        const response = await this.makeRequest('confluence_get_page_version_details', {
+            page_id: pageId,
+            version_number: versionNumber
+        });
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to get version details');
+        }
+
+        console.log(`✅ Version ${versionNumber} details retrieved for ${pageId}`);
+        return response.data;
+    }
+
     async healthCheck(): Promise<boolean> {
         try {
             await this.searchConfluence('type = page', 1);

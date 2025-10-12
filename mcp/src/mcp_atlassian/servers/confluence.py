@@ -924,3 +924,102 @@ async def search_user(
             indent=2,
             ensure_ascii=False,
         )
+
+
+@confluence_mcp.tool(tags={"confluence", "read"})
+async def get_page_versions(
+    ctx: Context,
+    page_id: Annotated[
+        str,
+        Field(
+            description=(
+                "Confluence page ID (numeric ID, can be parsed from URL, "
+                "e.g. from 'https://example.atlassian.net/wiki/spaces/TEAM/pages/123456789/Page+Title' "
+                "-> '123456789')"
+            )
+        ),
+    ],
+    start: Annotated[
+        int,
+        Field(
+            description="Starting index for pagination (0-based)",
+            default=0,
+            ge=0,
+        ),
+    ] = 0,
+    limit: Annotated[
+        int,
+        Field(
+            description="Maximum number of versions to return (1-100)",
+            default=25,
+            ge=1,
+            le=100,
+        ),
+    ] = 25,
+) -> str:
+    """Get all versions of a Confluence page.
+
+    Args:
+        ctx: The FastMCP context.
+        page_id: Confluence page ID.
+        start: Starting index for pagination.
+        limit: Maximum number of versions to return.
+
+    Returns:
+        JSON string representing page version history.
+    """
+    confluence_fetcher = await get_confluence_fetcher(ctx)
+    try:
+        versions = confluence_fetcher.get_page_versions(page_id, start, limit)
+        return json.dumps(versions, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error getting page versions for {page_id}: {e}")
+        return json.dumps(
+            {"error": f"Failed to get page versions: {e}"},
+            indent=2,
+            ensure_ascii=False,
+        )
+
+
+@confluence_mcp.tool(tags={"confluence", "read"})
+async def get_page_version_details(
+    ctx: Context,
+    page_id: Annotated[
+        str,
+        Field(
+            description=(
+                "Confluence page ID (numeric ID, can be parsed from URL, "
+                "e.g. from 'https://example.atlassian.net/wiki/spaces/TEAM/pages/123456789/Page+Title' "
+                "-> '123456789')"
+            )
+        ),
+    ],
+    version_number: Annotated[
+        int,
+        Field(
+            description="Version number to retrieve",
+            ge=1,
+        ),
+    ],
+) -> str:
+    """Get details of a specific version of a Confluence page.
+
+    Args:
+        ctx: The FastMCP context.
+        page_id: Confluence page ID.
+        version_number: Version number to retrieve.
+
+    Returns:
+        JSON string representing version details.
+    """
+    confluence_fetcher = await get_confluence_fetcher(ctx)
+    try:
+        version_details = confluence_fetcher.get_page_version_details(page_id, version_number)
+        return json.dumps(version_details, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error getting version {version_number} for page {page_id}: {e}")
+        return json.dumps(
+            {"error": f"Failed to get version details: {e}"},
+            indent=2,
+            ensure_ascii=False,
+        )

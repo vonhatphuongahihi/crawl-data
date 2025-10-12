@@ -18,7 +18,7 @@ export interface WikiPageData {
     last_modified_by: string;
     number_of_versions: number;
     parent_page_ids?: string | null;
-    created_by_id?: number | undefined;
+    created_by_id?: number | null;
     created_at?: Date | null;
     nearest_parent_id?: string | null;
     space_key?: string | undefined;
@@ -26,6 +26,7 @@ export interface WikiPageData {
     status: string;
     version_number: number;
     last_modified_at?: Date | null;
+    last_modified_by_id?: number | null;
 }
 
 export interface WikiViewData {
@@ -83,9 +84,15 @@ export class WikiDataMapper {
 
     // Map user from MCP response to database format
     static mapUser(wikiUser: WikiUser): WikiUserData {
+        // Debug: Log user data to identify "results" issue
+        console.log(`🔍 DEBUG mapUser input:`, JSON.stringify(wikiUser, null, 2));
+
         // Handle missing user info from MCP tool - use fallbacks
         const userId = wikiUser.accountId || wikiUser.username || wikiUser.displayName || 'unknown';
         const userKey = wikiUser.userKey || wikiUser.accountId || wikiUser.username || wikiUser.displayName || 'unknown';
+
+        // Debug: Log final userKey
+        console.log(`🔍 DEBUG mapUser result:`, { userId, userKey, displayName: wikiUser.displayName });
 
         return {
             user_id: userId,
@@ -99,9 +106,23 @@ export class WikiDataMapper {
     }
 
     // Map page from MCP response to database format
-    static mapPage(wikiPage: WikiPage, createdById?: number): WikiPageData {
+    static mapPage(wikiPage: WikiPage, createdById?: number, lastModifiedById?: number): WikiPageData {
         // MCP tools should return full URL in the response
         const fullUrl = wikiPage._links?.webui || wikiPage.url || '';
+
+        // Extract parent info from ancestors
+        let parentPageIds: string | null = null;
+        let nearestParentId: string | null = null;
+
+        if ((wikiPage as any).ancestors && Array.isArray((wikiPage as any).ancestors)) {
+            const ancestors = (wikiPage as any).ancestors;
+            if (ancestors.length > 0) {
+                // Get all parent IDs
+                parentPageIds = ancestors.map((ancestor: any) => ancestor.id).join(',');
+                // Get nearest parent (first in the array)
+                nearestParentId = ancestors[0].id;
+            }
+        }
 
         return {
             page_id: wikiPage.id,
@@ -110,15 +131,16 @@ export class WikiDataMapper {
             views: (wikiPage as any).views || 0, // Use views from MCP tool
             last_modified_by: wikiPage.version?.by?.displayName || '',
             number_of_versions: wikiPage.version?.number || 1,
-            parent_page_ids: null, // Will be populated separately
-            created_by_id: createdById || undefined,
-            created_at: wikiPage.version?.when ? new Date(wikiPage.version.when) : null,
-            nearest_parent_id: null, // Will be populated separately
+            parent_page_ids: parentPageIds, // Now populated from ancestors
+            created_by_id: createdById || null,
+            created_at: wikiPage.created ? new Date(wikiPage.created) : (wikiPage.version?.when ? new Date(wikiPage.version.when) : null),
+            nearest_parent_id: nearestParentId, // Now populated from ancestors
             space_key: wikiPage.space?.key,
             content_type: wikiPage.type || 'page',
             status: wikiPage.status || 'current',
             version_number: wikiPage.version?.number || 1,
-            last_modified_at: wikiPage.version?.when ? new Date(wikiPage.version.when) : null
+            last_modified_at: wikiPage.version?.when ? new Date(wikiPage.version.when) : null,
+            last_modified_by_id: lastModifiedById || null
         };
     }
 
@@ -241,7 +263,7 @@ export class WikiDataMapper {
         return wikiPages.map(wikiPage => {
             const userKey = wikiPage.version?.by?.userKey || wikiPage.version?.by?.accountId;
             const createdById = userKey ? createdByIdMap?.get(userKey) : undefined;
-            return this.mapPage(wikiPage, createdById);
+            return this.mapPage(wikiPage, createdById, undefined);
         });
     }
 
@@ -339,9 +361,9 @@ export class WikiDataMapper {
     }
 
     // Extract all entities from a Wiki page (similar to Jira's extractAllEntities)
-    static extractAllEntities(wikiPage: WikiPage) {
+    static extractAllEntities(wikiPage: WikiPage, createdById?: number, lastModifiedById?: number) {
         const entities = {
-            page: this.mapPage(wikiPage),
+            page: this.mapPage(wikiPage, createdById, lastModifiedById),
             labels: [] as WikiLabelData[],
             comments: [] as WikiCommentData[],
             contributors: [] as WikiContributorData[],
