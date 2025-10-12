@@ -418,6 +418,22 @@ export class WikiDatabaseService {
         }
     }
 
+    // Get views by page ID and user keys (returns full view objects)
+    async getViewsByPageIdAndUserKeys(pageId: string, userKeys: string[]): Promise<any[]> {
+        if (userKeys.length === 0) return [];
+
+        const connection = await this.pool.getConnection();
+        try {
+            const placeholders = userKeys.map(() => '?').join(',');
+            const query = `SELECT * FROM wiki_views WHERE page_id = ? AND user_key IN (${placeholders})`;
+
+            const [rows] = await connection.execute(query, [pageId, ...userKeys]);
+            return rows as any[];
+        } finally {
+            connection.release();
+        }
+    }
+
     // Save crawl history
     async saveCrawlHistory(crawlAt: string, pageCrawled: number, successfulCrawls: number = 0, failedCrawls: number = 0, crawlDurationMs: number = 0): Promise<number> {
         const connection = await this.pool.getConnection();

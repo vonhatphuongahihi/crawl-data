@@ -477,7 +477,8 @@ async function crawlWikiData() {
                                                 views_id: 0, // Will be linked after views are saved
                                                 visit_date: formattedDate, // YYYY-MM-DD HH:MM:SS format
                                                 unix_date: visit.unixDate || visitDate.getTime().toString(),
-                                                visit_id: visit.visitId || (Date.now() + index) // Generate unique ID
+                                                visit_id: visit.visitId || (Date.now() + index), // Generate unique ID
+                                                _temp_user_key: userKey // Temporary field to help with linking
                                             };
                                         });
 
@@ -648,7 +649,35 @@ async function crawlWikiData() {
 
                             // Save visit histories (after views are saved)
                             if (allEntities.visitHistories.length > 0) {
-                                await databaseService.saveVisitHistories(allEntities.visitHistories);
+                                // Need to link views_id to actual wiki_views.id
+                                // First, get the IDs of the newly saved views
+                                const savedViews = await databaseService.getViewsByPageIdAndUserKeys(
+                                    wikiPage.id,
+                                    allEntities.views.map(v => v.user_key)
+                                );
+
+                                const visitHistoriesWithViewsId = allEntities.visitHistories.map(vh => {
+                                    // Find the corresponding view for this visit history using _temp_user_key
+                                    const tempUserKey = vh._temp_user_key;
+                                    const savedView = savedViews.find(sv => sv.user_key === tempUserKey);
+
+                                    console.log(`🔗 Linking visit history for user ${tempUserKey}:`, {
+                                        tempUserKey,
+                                        savedViewId: savedView?.id,
+                                        savedViewUserKey: savedView?.user_key,
+                                        availableViews: savedViews.map(sv => ({ id: sv.id, user_key: sv.user_key }))
+                                    });
+
+                                    return {
+                                        views_id: savedView?.id || 0, // Link to the saved view's ID
+                                        visit_date: vh.visit_date,
+                                        unix_date: vh.unix_date,
+                                        visit_id: vh.visit_id
+                                        // Remove _temp_user_key as it's not a database field
+                                    };
+                                });
+
+                                await databaseService.saveVisitHistories(visitHistoriesWithViewsId);
                                 console.log(`   ✅ Saved ${allEntities.visitHistories.length} visit histories`);
                             }
 
