@@ -332,6 +332,46 @@ async function crawlWikiData() {
                                 page_id: wikiPage.id
                             });
                             console.log(`💬 Found ${comments.length} comments for page ${wikiPage.id}`);
+
+                            // Debug: Log comment structure
+                            if (comments.length > 0) {
+                                console.log(`🔍 Raw comment data from MCP for ${wikiPage.id}:`);
+                                console.log(JSON.stringify(comments[0], null, 2));
+
+                                // Debug: Check specific fields
+                                const firstComment = comments[0];
+                                console.log(`🔍 Comment field analysis for ${wikiPage.id}:`);
+                                console.log(`   - comment.id:`, firstComment.id);
+                                console.log(`   - comment.title:`, firstComment.title);
+                                console.log(`   - comment.body:`, firstComment.body);
+                                console.log(`   - comment.created:`, firstComment.created);
+                                console.log(`   - comment.updated:`, firstComment.updated);
+                                console.log(`   - comment.author:`, firstComment.author);
+                                console.log(`   - comment.version:`, firstComment.version);
+                                console.log(`   - comment.type:`, firstComment.type);
+                                console.log(`   - comment.status:`, firstComment.status);
+
+                                // Check author fields
+                                if (firstComment.author) {
+                                    console.log(`   - author.userKey:`, firstComment.author.userKey);
+                                    console.log(`   - author.accountId:`, firstComment.author.accountId);
+                                    console.log(`   - author.displayName:`, firstComment.author.displayName);
+                                    console.log(`   - author.email:`, firstComment.author.email);
+                                }
+
+                                // Check version fields
+                                if (firstComment.version) {
+                                    console.log(`   - version.by.userKey:`, firstComment.version.by?.userKey);
+                                    console.log(`   - version.by.accountId:`, firstComment.version.by?.accountId);
+                                    console.log(`   - version.by.displayName:`, firstComment.version.by?.displayName);
+                                    console.log(`   - version.when:`, firstComment.version.when);
+                                    console.log(`   - version.number:`, firstComment.version.number);
+                                }
+
+                                console.log(`   - Full comment keys:`, Object.keys(firstComment));
+                            } else {
+                                console.log(`   💤 No comments found for page ${wikiPage.id}`);
+                            }
                         } catch (commentError) {
                             console.warn(`⚠️ Could not get comments for page ${wikiPage.id}:`, commentError);
                         }
@@ -339,6 +379,26 @@ async function crawlWikiData() {
                         // Map additional data
                         const mappedLabels = WikiDataMapper.mapMultipleLabels(wikiPage.id, labels);
                         const mappedComments = WikiDataMapper.mapMultipleComments(comments, wikiPage.id);
+
+                        // Debug: Log mapped comments
+                        if (mappedComments.length > 0) {
+                            console.log(`🔍 Mapped comments for ${wikiPage.id}:`);
+                            console.log(JSON.stringify(mappedComments[0], null, 2));
+
+                            const firstMappedComment = mappedComments[0];
+                            console.log(`🔍 Mapped comment field analysis for ${wikiPage.id}:`);
+                            console.log(`   - mappedComment.comment_id:`, firstMappedComment.comment_id);
+                            console.log(`   - mappedComment.page_id:`, firstMappedComment.page_id);
+                            console.log(`   - mappedComment.comment_title:`, firstMappedComment.comment_title);
+                            console.log(`   - mappedComment.comment_body:`, firstMappedComment.comment_body ? 'HAS_CONTENT' : 'NULL/EMPTY');
+                            console.log(`   - mappedComment.author_user_key:`, firstMappedComment.author_user_key);
+                            console.log(`   - mappedComment.created_at:`, firstMappedComment.created_at);
+                            console.log(`   - mappedComment.updated_at:`, firstMappedComment.updated_at);
+                            console.log(`   - mappedComment.version_number:`, firstMappedComment.version_number);
+                            console.log(`   - mappedComment.status:`, firstMappedComment.status);
+                        } else {
+                            console.log(`   💤 No mapped comments for page ${wikiPage.id}`);
+                        }
 
                         // Map additional data from MCP tools
                         let mappedViews = [];
@@ -405,12 +465,21 @@ async function crawlWikiData() {
                                         };
 
                                         // Create visit history records for this user
-                                        const userVisitHistories = userVisits.map((visit, index) => ({
-                                            views_id: 0, // Will be linked after views are saved
-                                            visit_date: visit.visitDate || visit.date || new Date().toISOString(),
-                                            unix_date: visit.unixDate || new Date(visit.visitDate || visit.date || new Date()).getTime().toString(),
-                                            visit_id: visit.visitId || (Date.now() + index) // Generate unique ID
-                                        }));
+                                        const userVisitHistories = userVisits.map((visit, index) => {
+                                            // Convert date to MySQL DATETIME format (YYYY-MM-DD HH:MM:SS)
+                                            let visitDateStr = visit.visitDate || visit.date || new Date().toISOString();
+                                            let visitDate = new Date(visitDateStr);
+
+                                            // Format as YYYY-MM-DD HH:MM:SS for MySQL DATETIME column
+                                            const formattedDate = visitDate.toISOString().replace('T', ' ').replace('Z', '').split('.')[0];
+
+                                            return {
+                                                views_id: 0, // Will be linked after views are saved
+                                                visit_date: formattedDate, // YYYY-MM-DD HH:MM:SS format
+                                                unix_date: visit.unixDate || visitDate.getTime().toString(),
+                                                visit_id: visit.visitId || (Date.now() + index) // Generate unique ID
+                                            };
+                                        });
 
                                         return { viewRecord, userVisitHistories };
                                     });

@@ -85,15 +85,13 @@ CREATE TABLE wiki_contributors (
 CREATE TABLE wiki_visit_histories (
     visit_id INT AUTO_INCREMENT PRIMARY KEY,
     views_id INT NOT NULL,
-    visit_date DATE NOT NULL,
+    visit_date DATETIME NOT NULL, -- Changed from DATE to DATETIME to support full timestamp
     unix_date VARCHAR(20),
-    visit_timestamp TIMESTAMP NULL,
     create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (views_id) REFERENCES wiki_views(id) ON DELETE CASCADE,
     INDEX idx_views_history (views_id),
-    INDEX idx_visit_date (visit_date),
-    INDEX idx_visit_timestamp (visit_timestamp)
+    INDEX idx_visit_date (visit_date)
 );
 
 -- Wiki History Crawl Pages Table (tracking crawl history)
