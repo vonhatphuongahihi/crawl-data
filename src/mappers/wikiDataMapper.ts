@@ -175,20 +175,35 @@ export class WikiDataMapper {
         // Use provided pageId or try to extract from comment data
         const finalPageId = pageId || wikiComment._expandable?.container?.split('/').pop() || '';
 
-        // Extract body content safely
-        let bodyContent: string | null = null;
-        if (wikiComment.body?.view?.value) {
-            bodyContent = wikiComment.body.view.value;
-        } else if (wikiComment.body?.storage?.value) {
-            bodyContent = wikiComment.body.storage.value;
-        }
+        // Extract body content - now directly available from ConfluenceComment model
+        const bodyContent = wikiComment.body || null;
 
-        // Extract author safely
+        // Extract author safely - try author first, then version.by
         let authorKey: string | null = null;
-        if (wikiComment.version?.by?.userKey) {
+        if (wikiComment.author?.userKey) {
+            authorKey = wikiComment.author.userKey;
+        } else if (wikiComment.author?.accountId) {
+            authorKey = wikiComment.author.accountId;
+        } else if (wikiComment.version?.by?.userKey) {
             authorKey = wikiComment.version.by.userKey;
         } else if (wikiComment.version?.by?.accountId) {
             authorKey = wikiComment.version.by.accountId;
+        }
+
+        // Extract timestamps - try direct fields first, then version
+        let createdAt: Date | null = null;
+        let updatedAt: Date | null = null;
+
+        if (wikiComment.created) {
+            createdAt = new Date(wikiComment.created);
+        } else if (wikiComment.version?.when) {
+            createdAt = new Date(wikiComment.version.when);
+        }
+
+        if (wikiComment.updated) {
+            updatedAt = new Date(wikiComment.updated);
+        } else if (wikiComment.version?.when) {
+            updatedAt = new Date(wikiComment.version.when);
         }
 
         return {
@@ -197,8 +212,8 @@ export class WikiDataMapper {
             comment_title: wikiComment.title || null,
             comment_body: bodyContent,
             author_user_key: authorKey,
-            created_at: wikiComment.version?.when ? new Date(wikiComment.version.when) : null,
-            updated_at: wikiComment.version?.when ? new Date(wikiComment.version.when) : null,
+            created_at: createdAt,
+            updated_at: updatedAt,
             version_number: wikiComment.version?.number || 1,
             status: wikiComment.status || 'current'
         };

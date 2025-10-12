@@ -67,6 +67,18 @@ export interface WikiComment {
     type: string;
     status: string;
     title?: string;
+    body: string; // Direct body content from ConfluenceComment model
+    created: string; // Direct created timestamp
+    updated: string; // Direct updated timestamp
+    author?: {
+        type: string;
+        accountId: string;
+        accountType: string;
+        email?: string;
+        publicName: string;
+        displayName: string;
+        userKey?: string;
+    };
     version?: {
         by: {
             type: string;
@@ -82,16 +94,6 @@ export interface WikiComment {
         message?: string;
         number: number;
         minorEdit?: boolean;
-    };
-    body?: {
-        view?: {
-            value: string;
-            representation: string;
-        };
-        storage?: {
-            value: string;
-            representation: string;
-        };
     };
     _expandable?: {
         container?: string;

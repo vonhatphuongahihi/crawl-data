@@ -344,31 +344,93 @@ async function crawlWikiData() {
                         let mappedViews = [];
                         let mappedContributors = [];
                         let mappedVisitHistories = [];
+                        let visitHistoryUsers = []; // Users created from visit history
 
-                        // Map views data if available - get actual user visit history
+                        // Map views data if available - follow api.ts logic
                         if (pageViews && pageViews.total_views > 0) {
-                            // Get detailed visit history from MCP tool
                             try {
-                                const visitHistoryData = await mcpService.getVisitHistory(wikiPage.id);
-                                console.log(`📊 Visit history data for ${wikiPage.id}:`, JSON.stringify(visitHistoryData, null, 2));
+                                // Step 1: Get visit history by user name (like getVisitHistoryByUserName in api.ts)
+                                const visitHistoryByUserName = await mcpService.getVisitHistory(wikiPage.id);
+                                console.log(`📊 Visit history by user name for ${wikiPage.id}:`, JSON.stringify(visitHistoryByUserName, null, 2));
 
-                                // Map visit history to views (each user gets their own view record)
-                                if (visitHistoryData && Array.isArray(visitHistoryData)) {
-                                    mappedViews = visitHistoryData.map(visit => ({
-                                        page_id: wikiPage.id,
-                                        user_key: visit.userKey || visit.username,
-                                        total: visit.views || 1, // Individual user view count
-                                        last_view: new Date(visit.lastVisit || visit.visitDate || new Date())
-                                    }));
+                                if (visitHistoryByUserName && typeof visitHistoryByUserName === 'object') {
+                                    const userNames = Object.keys(visitHistoryByUserName);
+                                    console.log(`👥 Found ${userNames.length} users with visit history:`, userNames);
 
-                                    // Also map visit histories
-                                    mappedVisitHistories = visitHistoryData.map(visit => ({
-                                        views_id: 0, // Will be linked after views are saved
-                                        visit_date: visit.visitDate || visit.date,
-                                        unix_date: visit.unixDate || new Date(visit.visitDate || visit.date).getTime().toString(),
-                                        visit_id: visit.visitId || Math.floor(Math.random() * 1000000)
-                                    }));
+                                    // Step 2: Create views for each user (like storeWikiViews in api.ts)
+                                    const viewPromises = userNames.map(async (username) => {
+                                        const userVisits = visitHistoryByUserName[username];
+                                        if (!userVisits || !Array.isArray(userVisits)) return null;
+
+                                        // Get user info (try to find existing user or create new one)
+                                        let userKey = username; // Default fallback
+                                        let displayName = username;
+
+                                        // Try to find user in existing users
+                                        const existingUser = mappedData.users.find(u =>
+                                            u.user_key === username ||
+                                            u.user_id === username ||
+                                            u.display_name === username
+                                        );
+
+                                        if (existingUser) {
+                                            userKey = existingUser.user_key;
+                                            displayName = existingUser.display_name;
+                                        } else {
+                                            // Create new user from visit history
+                                            const newUser = {
+                                                user_id: username,
+                                                user_key: username,
+                                                display_name: username,
+                                                avatar_url: null,
+                                                roles: '',
+                                                english_name: null,
+                                                is_resigned: false
+                                            };
+                                            visitHistoryUsers.push(newUser);
+                                        }
+
+                                        // Calculate total views for this user
+                                        const totalViews = userVisits.length;
+                                        const lastVisitDate = userVisits.length > 0 ?
+                                            new Date(userVisits[userVisits.length - 1].visitDate || userVisits[userVisits.length - 1].date || new Date()) :
+                                            new Date();
+
+                                        // Create view record
+                                        const viewRecord = {
+                                            page_id: wikiPage.id,
+                                            user_key: userKey,
+                                            total: totalViews,
+                                            last_view: lastVisitDate
+                                        };
+
+                                        // Create visit history records for this user
+                                        const userVisitHistories = userVisits.map((visit, index) => ({
+                                            views_id: 0, // Will be linked after views are saved
+                                            visit_date: visit.visitDate || visit.date || new Date().toISOString(),
+                                            unix_date: visit.unixDate || new Date(visit.visitDate || visit.date || new Date()).getTime().toString(),
+                                            visit_id: visit.visitId || (Date.now() + index) // Generate unique ID
+                                        }));
+
+                                        return { viewRecord, userVisitHistories };
+                                    });
+
+                                    // Wait for all view records to be processed
+                                    const viewResults = await Promise.all(viewPromises);
+
+                                    // Extract views and visit histories
+                                    mappedViews = viewResults
+                                        .filter(result => result !== null)
+                                        .map(result => result.viewRecord);
+
+                                    mappedVisitHistories = viewResults
+                                        .filter(result => result !== null)
+                                        .flatMap(result => result.userVisitHistories);
+
+                                    console.log(`✅ Created ${mappedViews.length} view records and ${mappedVisitHistories.length} visit history records`);
+
                                 } else {
+                                    console.log(`⚠️ No visit history data found for ${wikiPage.id}, using fallback`);
                                     // Fallback: create single view record with total views
                                     let viewUserKey = 'system';
                                     if (mappedData.users && mappedData.users.length > 0) {
@@ -386,6 +448,7 @@ async function crawlWikiData() {
                                         last_view: new Date()
                                     }];
                                 }
+
                             } catch (visitError) {
                                 console.warn(`⚠️ Could not get visit history for ${wikiPage.id}:`, visitError);
 
@@ -434,25 +497,7 @@ async function crawlWikiData() {
 
                         // Note: Visit history mapping is now handled above in the views section
 
-                        // Extract users from visit history and add to users list
-                        const visitHistoryUsers = [];
-                        if (mappedViews.length > 0) {
-                            for (const view of mappedViews) {
-                                const existingUser = mappedData.users.find(u => u.user_key === view.user_key);
-                                if (!existingUser && view.user_key !== 'system') {
-                                    // Create user from visit history
-                                    visitHistoryUsers.push({
-                                        user_id: view.user_key,
-                                        user_key: view.user_key,
-                                        display_name: view.user_key, // Fallback name
-                                        avatar_url: null,
-                                        roles: '',
-                                        english_name: null,
-                                        is_resigned: false
-                                    });
-                                }
-                            }
-                        }
+                        // Note: visitHistoryUsers are now created in the views mapping section above
 
                         // Combine all data
                         const allEntities = {
