@@ -59,7 +59,7 @@ export class DatabaseService {
 
             for (const user of users) {
                 await this.insertOrUpdate(connection, 'bts_users', user, [
-                    'display_name', 'email_address', 'active'
+                    'account_id', 'display_name', 'email_address', 'active'
                 ]);
             }
 
@@ -84,7 +84,8 @@ export class DatabaseService {
 
             for (const project of projects) {
                 await this.insertOrUpdate(connection, 'bts_projects', project, [
-                    'name', 'project_type', 'description', 'lead_account_id'
+                    'name', 'project_type_key', 'archived', 'project_category_self',
+                    'project_category_id', 'project_category_name', 'project_category_description'
                 ]);
             }
 
@@ -159,11 +160,10 @@ export class DatabaseService {
 
             for (const issue of issues) {
                 await this.insertOrUpdate(connection, 'bts_issues', issue, [
-                    'summary', 'status_id', 'status_name', 'assignee_id', 'assignee_name', 
-                    'reporter_id', 'reporter_name', 'project_key', 'project_name',
-                    'issue_type_id', 'issue_type_name', 'priority_id', 'priority_name',
-                    'updated', 'time_estimate', 'time_original_estimate', 'description',
-                    'labels', 'components', 'fix_versions', 'attachments', 'subtasks'
+                    'summary', 'status_name', 'assignee_name',
+                    'reporter_name', 'project_key', 'project_name',
+                    'issue_type_name', 'priority_name', 'updated', 'description',
+                    'labels', 'subtasks', 'changelog'
                 ]);
             }
 
@@ -325,7 +325,6 @@ export class DatabaseService {
     async saveAllEntities(entities: {
         users: DatabaseUser[];
         projects: DatabaseProject[];
-        statuses: DatabaseStatus[];
         fixVersions: DatabaseFixVersion[];
         issues: DatabaseIssue[];
         components: DatabaseComponent[];
@@ -340,7 +339,7 @@ export class DatabaseService {
             // Save in dependency order
             await this.saveUsers(entities.users);
             await this.saveProjects(entities.projects);
-            await this.saveStatuses(entities.statuses);
+            // Status is now handled directly in issues as status_name
             await this.saveFixVersions(entities.fixVersions);
             await this.saveIssues(entities.issues);
             await this.saveComponents(entities.components);

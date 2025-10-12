@@ -69,20 +69,50 @@ async function crawlCompanyData() {
         const databaseService = new DatabaseService();
         const pageSize = 50;
 
-        // Step 3: Save all projects first
-        if (projects.length > 0) {
-            console.log('\n💾 Saving all projects to database...');
+        // Define projects to exclude by key
+        const excludedProjectKeys = [
+            'TESTASKDBB', 'NFREPORT', 'ADVANCED_A', 'ASKSEG', 'BPH', 'CITS',
+            'CLIP_SUPPORT', 'VULNERABILITY', 'DATA_REQUEST', 'DATA_PRODUCT',
+            'FACESIGNREQ', 'FASTIDQNA', 'GSS_REQUEST', 'NAVER2024',
+            'N3R_PUBLIC_REQUEST', 'N3R_COUNTER', 'NBILLY_SUPPORT',
+            'NELOISSUETEST', 'NGRINDER', 'NPAYGOODS', 'PCGAME', 'KERBEROS',
+            'SHARED', 'SSPMO', 'VITESS_SUPPORT', 'YESSL_INQUIRY', 'DATAREVIEW',
+            'NAVERAPPDATA', 'NPAYOFFLINEDESIGN', 'NPAYONLINEDESIGN',
+            'NPAYOFFLINEPAYMENT', 'NAMCSUPPORT', 'CERTAPPMGMT', 'NCLOUD_PORTAL',
+            'BOARD_SAMPLE', 'SMARTEDITORSUPPORT', 'MEMBERREQ'
+        ];
+
+        // Filter out excluded projects
+        const filteredProjects = projects.filter(project => {
+            const projectKey = project.key || '';
+            const projectName = project.name || '';
+
+            // Check if project is in excluded list
+            const isExcluded = excludedProjectKeys.includes(projectKey);
+            if (isExcluded) {
+                console.log(`🚫 Skipping excluded project: ${projectKey} - ${projectName}`);
+                return false;
+            }
+
+            return true;
+        });
+
+        console.log(`📊 After filtering: ${filteredProjects.length} projects (removed ${projects.length - filteredProjects.length} projects)`);
+
+        // Step 3: Save all filtered projects first
+        if (filteredProjects.length > 0) {
+            console.log('\n💾 Saving all filtered projects to database...');
             const connection = await databaseService.pool.getConnection();
             try {
                 await connection.beginTransaction();
 
-                for (const project of projects) {
+                for (const project of filteredProjects) {
                     const mappedProject = JiraDataMapper.mapProject(project);
                     await databaseService.saveProjects([mappedProject], connection);
                 }
 
                 await connection.commit();
-                console.log(`✅ Saved ${projects.length} projects to database`);
+                console.log(`✅ Saved ${filteredProjects.length} projects to database`);
             } catch (error) {
                 await connection.rollback();
                 console.error('❌ Failed to save projects:', error);
@@ -92,8 +122,8 @@ async function crawlCompanyData() {
             }
         }
 
-        // Step 4: Loop through all projects to crawl issues
-        for (const project of projects) {
+        // Step 4: Loop through all filtered projects to crawl issues
+        for (const project of filteredProjects) {
             console.log(`\n🚀 Crawling project ${project.key} (${project.name})...`);
             let startAt = 0;
 
@@ -143,10 +173,7 @@ async function crawlCompanyData() {
                             // Don't save project here - already saved in Step 3 with full info
                             // await databaseService.saveProjects([mappedData.project], connection);
 
-                            // Save status before issues to avoid foreign key constraint
-                            if (mappedData.status) {
-                                await databaseService.saveStatuses([mappedData.status], connection);
-                            }
+                            // Status is now handled directly in mapIssue as status_name
 
                             await databaseService.saveIssues([mappedData.issue], connection);
 
