@@ -325,7 +325,7 @@ async function crawlWikiData() {
                             await databaseService.saveSpaces(allEntities.spaces);
 
                             // Get user map to link created_by_id
-                            const userMap = await databaseService.getWikiUserMapByUserKeys(
+                            const userMap = await databaseService.getUserIdsByUserKeys(
                                 allEntities.users.map(u => u.user_key)
                             );
 
@@ -336,7 +336,14 @@ async function crawlWikiData() {
                                 for (const page of validPages) {
                                     if (mappedData.users && mappedData.users.length > 0) {
                                         const creator = mappedData.users[0];
-                                        page.created_by_id = userMap.get(creator.user_key);
+                                        const createdById = userMap.get(creator.user_key);
+                                        console.log(`🔗 Linking page ${page.page_id} to user:`, {
+                                            userKey: creator.user_key,
+                                            userId: creator.user_id,
+                                            createdById: createdById,
+                                            userMapSize: userMap.size
+                                        });
+                                        page.created_by_id = createdById;
                                     }
                                 }
                                 await databaseService.savePages(validPages);

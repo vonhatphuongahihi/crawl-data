@@ -679,6 +679,78 @@ export class MCPWikiService extends EventEmitter {
         return allPages;
     }
 
+    // Get page creator information from history
+    async getPageCreator(pageId: string): Promise<any> {
+        console.log(`👤 Getting page creator for ${pageId}...`);
+
+        const response = await this.makeRequest('confluence_get_page_history', {
+            page_id: pageId
+        });
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to get page creator');
+        }
+
+        console.log(`✅ Page creator retrieved for ${pageId}`);
+        console.log(`👤 Creator data:`, JSON.stringify(response.data, null, 2));
+
+        return response.data;
+    }
+
+    // Get all versions of a page
+    async getPageVersions(pageId: string): Promise<any> {
+        console.log(`📚 Getting page versions for ${pageId}...`);
+
+        const response = await this.makeRequest('confluence_get_page_versions', {
+            page_id: pageId
+        });
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to get page versions');
+        }
+
+        console.log(`✅ Page versions retrieved for ${pageId}`);
+        console.log(`📚 Versions data:`, JSON.stringify(response.data, null, 2));
+
+        return response.data;
+    }
+
+    // Get total view count for a page
+    async getPageViews(pageId: string): Promise<any> {
+        console.log(`👀 Getting page views for ${pageId}...`);
+
+        const response = await this.makeRequest('confluence_get_page_views', {
+            page_id: pageId
+        });
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to get page views');
+        }
+
+        console.log(`✅ Page views retrieved for ${pageId}`);
+        console.log(`👀 Views data:`, JSON.stringify(response.data, null, 2));
+
+        return response.data;
+    }
+
+    // Get visit history for a page
+    async getVisitHistory(pageId: string): Promise<any> {
+        console.log(`📊 Getting visit history for ${pageId}...`);
+
+        const response = await this.makeRequest('confluence_get_visit_history', {
+            page_id: pageId
+        });
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to get visit history');
+        }
+
+        console.log(`✅ Visit history retrieved for ${pageId}`);
+        console.log(`📊 Visit history data:`, JSON.stringify(response.data, null, 2));
+
+        return response.data;
+    }
+
     // Get all spaces (using search with CQL) - with pagination
     async getAllSpaces(limit: number = 50): Promise<WikiSpace[]> {
         try {

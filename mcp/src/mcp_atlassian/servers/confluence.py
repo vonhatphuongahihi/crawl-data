@@ -712,6 +712,151 @@ async def add_comment(
 
 
 @confluence_mcp.tool(tags={"confluence", "read"})
+async def get_page_history(
+    ctx: Context,
+    page_id: Annotated[
+        str,
+        Field(
+            description=(
+                "Confluence page ID (numeric ID, can be parsed from URL, "
+                "e.g. from 'https://example.atlassian.net/wiki/spaces/TEAM/pages/123456789/Page+Title' "
+                "-> '123456789')"
+            )
+        ),
+    ],
+) -> str:
+    """Get page creator information from history.
+
+    Args:
+        ctx: The FastMCP context.
+        page_id: Confluence page ID.
+
+    Returns:
+        JSON string representing page creator information.
+    """
+    confluence_fetcher = await get_confluence_fetcher(ctx)
+    try:
+        creator_info = confluence_fetcher.get_page_creator(page_id)
+        return json.dumps(creator_info, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error getting page creator for {page_id}: {e}")
+        return json.dumps(
+            {"error": f"Failed to get page creator: {e}"},
+            indent=2,
+            ensure_ascii=False,
+        )
+
+
+@confluence_mcp.tool(tags={"confluence", "read"})
+async def get_page_versions(
+    ctx: Context,
+    page_id: Annotated[
+        str,
+        Field(
+            description=(
+                "Confluence page ID (numeric ID, can be parsed from URL, "
+                "e.g. from 'https://example.atlassian.net/wiki/spaces/TEAM/pages/123456789/Page+Title' "
+                "-> '123456789')"
+            )
+        ),
+    ],
+) -> str:
+    """Get all versions of a page.
+
+    Args:
+        ctx: The FastMCP context.
+        page_id: Confluence page ID.
+
+    Returns:
+        JSON string representing all page versions.
+    """
+    confluence_fetcher = await get_confluence_fetcher(ctx)
+    try:
+        versions_info = confluence_fetcher.get_page_versions(page_id)
+        return json.dumps(versions_info, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error getting page versions for {page_id}: {e}")
+        return json.dumps(
+            {"error": f"Failed to get page versions: {e}"},
+            indent=2,
+            ensure_ascii=False,
+        )
+
+
+@confluence_mcp.tool(tags={"confluence", "read"})
+async def get_page_views(
+    ctx: Context,
+    page_id: Annotated[
+        str,
+        Field(
+            description=(
+                "Confluence page ID (numeric ID, can be parsed from URL, "
+                "e.g. from 'https://example.atlassian.net/wiki/spaces/TEAM/pages/123456789/Page+Title' "
+                "-> '123456789')"
+            )
+        ),
+    ],
+) -> str:
+    """Get total view count for a page.
+
+    Args:
+        ctx: The FastMCP context.
+        page_id: Confluence page ID.
+
+    Returns:
+        JSON string representing page view count.
+    """
+    confluence_fetcher = await get_confluence_fetcher(ctx)
+    try:
+        views_count = confluence_fetcher.get_page_total_views(page_id)
+        result = {"page_id": page_id, "total_views": views_count}
+        return json.dumps(result, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error getting page views for {page_id}: {e}")
+        return json.dumps(
+            {"error": f"Failed to get page views: {e}"},
+            indent=2,
+            ensure_ascii=False,
+        )
+
+
+@confluence_mcp.tool(tags={"confluence", "read"})
+async def get_visit_history(
+    ctx: Context,
+    page_id: Annotated[
+        str,
+        Field(
+            description=(
+                "Confluence page ID (numeric ID, can be parsed from URL, "
+                "e.g. from 'https://example.atlassian.net/wiki/spaces/TEAM/pages/123456789/Page+Title' "
+                "-> '123456789')"
+            )
+        ),
+    ],
+) -> str:
+    """Get visit history for a page.
+
+    Args:
+        ctx: The FastMCP context.
+        page_id: Confluence page ID.
+
+    Returns:
+        JSON string representing page visit history.
+    """
+    confluence_fetcher = await get_confluence_fetcher(ctx)
+    try:
+        visit_history = confluence_fetcher.get_page_visit_history(page_id)
+        return json.dumps(visit_history, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error getting visit history for {page_id}: {e}")
+        return json.dumps(
+            {"error": f"Failed to get visit history: {e}"},
+            indent=2,
+            ensure_ascii=False,
+        )
+
+
+@confluence_mcp.tool(tags={"confluence", "read"})
 async def search_user(
     ctx: Context,
     query: Annotated[
