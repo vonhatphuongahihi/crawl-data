@@ -28,6 +28,10 @@ async function callMCPTool(toolName, params) {
             return await mcpService.searchUsers(params.query, params.limit);
         case 'confluence_get_all_spaces':
             return await mcpService.getAllSpaces(params.limit);
+        case 'confluence_get_all_pages':
+            return await mcpService.getAllPages(params.batchSize);
+        case 'confluence_get_all_pages_from_space':
+            return await mcpService.getAllPagesFromSpace(params.spaceKey, params.batchSize);
         default:
             throw new Error(`Unknown tool: ${toolName}`);
     }
@@ -68,16 +72,9 @@ async function crawlWikiData() {
             });
         }
 
-        // Define spaces to include (you can modify this list)
-        const includedSpaceKeys = ['TEAM', 'PROJ']; // Add your target spaces here
-
-        // Filter spaces if needed
-        const filteredSpaces = spaces.filter(space => {
-            if (includedSpaceKeys.length === 0) return true; // Include all if no filter
-            return includedSpaceKeys.includes(space.key);
-        });
-
-        console.log(`📊 After filtering: ${filteredSpaces.length} spaces (from ${spaces.length} total)`);
+        // Use all spaces found (no filtering needed)
+        const filteredSpaces = spaces; // Use all spaces found by MCP
+        console.log(`📊 Processing all ${filteredSpaces.length} spaces found`);
 
         // Step 3: Save all filtered spaces first
         if (filteredSpaces.length > 0) {

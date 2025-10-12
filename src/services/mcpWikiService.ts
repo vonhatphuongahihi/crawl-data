@@ -603,38 +603,131 @@ export class MCPWikiService extends EventEmitter {
         return searchResult.results.map(result => result.content).filter(Boolean) as WikiPage[];
     }
 
-    // Get all spaces (using search with CQL)
-    async getAllSpaces(limit: number = 50): Promise<WikiSpace[]> {
-        // Note: This would need a specific spaces search tool or use search with CQL
-        // For now, we'll use a generic search approach
-        try {
-            const cqlQuery = 'type = page'; // Get all pages to extract unique spaces
-            const searchResult = await this.searchConfluence(cqlQuery, limit);
+    // Get ALL pages from a space with pagination
+    async getAllPagesFromSpace(spaceKey: string, batchSize: number = 100): Promise<WikiPage[]> {
+        const allPages: WikiPage[] = [];
+        let start = 0;
+        let hasMore = true;
 
-            const spaceMap = new Map<string, WikiSpace>();
+        console.log(`🔍 Getting ALL pages from space ${spaceKey} with pagination (batch: ${batchSize})`);
 
-            // Handle case where results might be undefined or empty
+        while (hasMore) {
+            const cqlQuery = `space = "${spaceKey}" AND type = page`;
+            const searchResult = await this.searchConfluence(cqlQuery, batchSize);
+
             const results = searchResult?.results || [];
-            console.log(`🔍 Processing ${results.length} results for spaces extraction`);
+            console.log(`📄 Processing batch: ${results.length} pages from space ${spaceKey} (start: ${start})`);
 
-            results.forEach(result => {
-                // MCP returns pages directly, not wrapped in content
-                if (result.space) {
-                    const space = result.space;
-                    if (!spaceMap.has(space.key)) {
-                        spaceMap.set(space.key, {
-                            id: typeof space.id === 'number' ? space.id : parseInt(space.key) || 0,
-                            key: space.key,
-                            name: space.name,
-                            type: space.type || 'space',
-                            status: space.status || 'current'
-                        });
-                    }
+            if (results.length === 0) {
+                hasMore = false;
+                break;
+            }
+
+            // Add pages from this batch
+            const pages = results.map(result => result.content).filter(Boolean) as WikiPage[];
+            allPages.push(...pages);
+
+            // Check if we got fewer results than requested (last page)
+            if (results.length < batchSize) {
+                hasMore = false;
+            } else {
+                start += batchSize;
+                // Small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+
+        console.log(`✅ Found ${allPages.length} total pages in space ${spaceKey}`);
+        return allPages;
+    }
+
+    // Get ALL pages from ALL spaces with pagination
+    async getAllPages(batchSize: number = 100): Promise<WikiPage[]> {
+        const allPages: WikiPage[] = [];
+        let start = 0;
+        let hasMore = true;
+
+        console.log(`🔍 Getting ALL pages from ALL spaces with pagination (batch: ${batchSize})`);
+
+        while (hasMore) {
+            const cqlQuery = 'type = page';
+            const searchResult = await this.searchConfluence(cqlQuery, batchSize);
+
+            const results = searchResult?.results || [];
+            console.log(`📄 Processing batch: ${results.length} pages from all spaces (start: ${start})`);
+
+            if (results.length === 0) {
+                hasMore = false;
+                break;
+            }
+
+            // Add pages from this batch
+            const pages = results.map(result => result.content).filter(Boolean) as WikiPage[];
+            allPages.push(...pages);
+
+            // Check if we got fewer results than requested (last page)
+            if (results.length < batchSize) {
+                hasMore = false;
+            } else {
+                start += batchSize;
+                // Small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+
+        console.log(`✅ Found ${allPages.length} total pages from all spaces`);
+        return allPages;
+    }
+
+    // Get all spaces (using search with CQL) - with pagination
+    async getAllSpaces(limit: number = 50): Promise<WikiSpace[]> {
+        try {
+            const spaceMap = new Map<string, WikiSpace>();
+            let start = 0;
+            let hasMore = true;
+
+            console.log(`🔍 Getting all spaces with pagination (limit: ${limit})`);
+
+            while (hasMore) {
+                const cqlQuery = 'type = page'; // Get all pages to extract unique spaces
+                const searchResult = await this.searchConfluence(cqlQuery, limit);
+
+                const results = searchResult?.results || [];
+                console.log(`📄 Processing batch: ${results.length} pages (start: ${start})`);
+
+                if (results.length === 0) {
+                    hasMore = false;
+                    break;
                 }
-            });
+
+                // Extract spaces from this batch
+                results.forEach(result => {
+                    if (result.space) {
+                        const space = result.space;
+                        if (!spaceMap.has(space.key)) {
+                            spaceMap.set(space.key, {
+                                id: typeof space.id === 'number' ? space.id : parseInt(space.key) || 0,
+                                key: space.key,
+                                name: space.name,
+                                type: space.type || 'space',
+                                status: space.status || 'current'
+                            });
+                        }
+                    }
+                });
+
+                // Check if we got fewer results than requested (last page)
+                if (results.length < limit) {
+                    hasMore = false;
+                } else {
+                    start += limit;
+                    // Small delay to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
 
             const spacesArray = Array.from(spaceMap.values());
-            console.log(`✅ Extracted ${spacesArray.length} unique spaces`);
+            console.log(`✅ Extracted ${spacesArray.length} unique spaces from all pages`);
             return spacesArray;
         } catch (error) {
             console.error('Error getting spaces:', error);

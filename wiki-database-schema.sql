@@ -17,14 +17,14 @@ CREATE TABLE wiki_users (
     INDEX idx_display_name (display_name)
 );
 
--- Wiki Pages Table
+-- Wiki Pages Table (updated for MCP data)
 CREATE TABLE wiki_pages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     page_id VARCHAR(255) NOT NULL UNIQUE,
     title TEXT NOT NULL,
     url TEXT NOT NULL,
     views INT DEFAULT 0,
-    last_modified_by VARCHAR(255),
+    last_modified_by VARCHAR(500), -- Increase size for longer names
     number_of_versions INT DEFAULT 0,
     parent_page_ids TEXT,
     created_by_id INT,
