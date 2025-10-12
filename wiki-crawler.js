@@ -276,7 +276,9 @@ async function crawlWikiData() {
                             },
                             _links: {
                                 webui: detailedPage.url
-                            }
+                            },
+                            // Add views data from MCP tool
+                            views: pageViews?.total_views || 0
                         };
 
                         console.log(`🔧 Transformed page for ${wikiPage.id}:`);
@@ -338,14 +340,62 @@ async function crawlWikiData() {
                         const mappedLabels = WikiDataMapper.mapMultipleLabels(wikiPage.id, labels);
                         const mappedComments = WikiDataMapper.mapMultipleComments(comments, wikiPage.id);
 
+                        // Map additional data from MCP tools
+                        let mappedViews = [];
+                        let mappedContributors = [];
+                        let mappedVisitHistories = [];
+
+                        // Map views data if available
+                        if (pageViews && pageViews.total_views > 0) {
+                            mappedViews = [{
+                                page_id: wikiPage.id,
+                                user_key: 'system', // System view count
+                                total: pageViews.total_views,
+                                last_view: new Date()
+                            }];
+                        }
+
+                        // Map contributors from page versions if available
+                        if (pageVersions) {
+                            const contributors = [];
+                            // Add creator
+                            if (pageVersions.createdBy) {
+                                contributors.push({
+                                    create_by_user_key: pageVersions.createdBy.userKey || pageVersions.createdBy.username,
+                                    confluence_page_id: wikiPage.id,
+                                    version: 1,
+                                    when_modified: new Date(pageVersions.createdDate)
+                                });
+                            }
+                            // Add last updater
+                            if (pageVersions.lastUpdated) {
+                                contributors.push({
+                                    create_by_user_key: pageVersions.lastUpdated.by.userKey || pageVersions.lastUpdated.by.username,
+                                    confluence_page_id: wikiPage.id,
+                                    version: pageVersions.lastUpdated.number,
+                                    when_modified: new Date(pageVersions.lastUpdated.when)
+                                });
+                            }
+                            mappedContributors = contributors;
+                        }
+
+                        // Map visit history if available
+                        if (visitHistory && Array.isArray(visitHistory)) {
+                            mappedVisitHistories = visitHistory.map(visit => ({
+                                views_id: 0, // Will be linked after views are saved
+                                visit_date: visit.visitDate || visit.date,
+                                unix_date: visit.unixDate || new Date(visit.visitDate || visit.date).getTime().toString()
+                            }));
+                        }
+
                         // Combine all data
                         const allEntities = {
                             users: mappedData.users,
                             spaces: mappedData.space ? [mappedData.space] : [],
                             pages: mappedData.page ? [mappedData.page] : [], // Fix: check if page exists
-                            views: mappedData.views,
-                            contributors: mappedData.contributors,
-                            visitHistories: [],
+                            views: mappedViews,
+                            contributors: mappedContributors,
+                            visitHistories: mappedVisitHistories,
                             labels: mappedLabels,
                             comments: mappedComments
                         };
@@ -404,11 +454,34 @@ async function crawlWikiData() {
                                 await databaseService.savePages(validPages);
                             }
 
-                            await databaseService.saveViews(allEntities.views);
-                            await databaseService.saveContributors(allEntities.contributors);
-                            await databaseService.saveVisitHistories(allEntities.visitHistories);
-                            await databaseService.saveLabels(allEntities.labels);
-                            await databaseService.saveComments(allEntities.comments);
+                            // Save views first (needed for visit history foreign key)
+                            if (allEntities.views.length > 0) {
+                                await databaseService.saveViews(allEntities.views);
+                                console.log(`   ✅ Saved ${allEntities.views.length} views`);
+                            }
+
+                            // Save contributors
+                            if (allEntities.contributors.length > 0) {
+                                await databaseService.saveContributors(allEntities.contributors);
+                                console.log(`   ✅ Saved ${allEntities.contributors.length} contributors`);
+                            }
+
+                            // Save visit histories (after views are saved)
+                            if (allEntities.visitHistories.length > 0) {
+                                await databaseService.saveVisitHistories(allEntities.visitHistories);
+                                console.log(`   ✅ Saved ${allEntities.visitHistories.length} visit histories`);
+                            }
+
+                            // Save labels and comments
+                            if (allEntities.labels.length > 0) {
+                                await databaseService.saveLabels(allEntities.labels);
+                                console.log(`   ✅ Saved ${allEntities.labels.length} labels`);
+                            }
+
+                            if (allEntities.comments.length > 0) {
+                                await databaseService.saveComments(allEntities.comments);
+                                console.log(`   ✅ Saved ${allEntities.comments.length} comments`);
+                            }
 
                             await connection.commit();
                             console.log(`   ✅ Saved page ${wikiPage.id} successfully`);

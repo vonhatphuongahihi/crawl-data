@@ -83,10 +83,14 @@ export class WikiDataMapper {
 
     // Map user from MCP response to database format
     static mapUser(wikiUser: WikiUser): WikiUserData {
+        // Handle missing user info from MCP tool - use fallbacks
+        const userId = wikiUser.accountId || wikiUser.username || wikiUser.displayName || 'unknown';
+        const userKey = wikiUser.userKey || wikiUser.accountId || wikiUser.username || wikiUser.displayName || 'unknown';
+
         return {
-            user_id: wikiUser.accountId,
-            user_key: wikiUser.userKey || wikiUser.accountId,
-            display_name: wikiUser.displayName,
+            user_id: userId,
+            user_key: userKey,
+            display_name: wikiUser.displayName || 'Unknown User',
             avatar_url: wikiUser.profilePicture?.path || null,
             roles: '', // Will be populated separately if needed
             english_name: null,
@@ -103,7 +107,7 @@ export class WikiDataMapper {
             page_id: wikiPage.id,
             title: wikiPage.title,
             url: fullUrl,
-            views: 0, // Will be populated from view tracking API
+            views: (wikiPage as any).views || 0, // Use views from MCP tool
             last_modified_by: wikiPage.version?.by?.displayName || '',
             number_of_versions: wikiPage.version?.number || 1,
             parent_page_ids: null, // Will be populated separately
@@ -333,10 +337,11 @@ export class WikiDataMapper {
         const users: WikiUserData[] = [];
         if (wikiPage.version?.by) {
             const userData: WikiUser = {
-                accountId: wikiPage.version.by.accountId,
-                accountType: wikiPage.version.by.accountType,
+                accountId: wikiPage.version.by.accountId || '',
+                username: (wikiPage.version.by as any).username, // Add username from MCP tool
+                accountType: (wikiPage.version.by as any).accountType || 'unknown',
                 email: wikiPage.version.by.email,
-                publicName: wikiPage.version.by.publicName,
+                publicName: wikiPage.version.by.publicName || wikiPage.version.by.displayName,
                 displayName: wikiPage.version.by.displayName,
                 userKey: wikiPage.version.by.userKey,
                 profilePicture: wikiPage.version.by.profilePicture,

@@ -119,6 +119,7 @@ export interface WikiSpace {
 
 export interface WikiUser {
     accountId: string;
+    username?: string; // Add username from MCP tools
     accountType: string;
     email?: string | undefined;
     publicName: string;
