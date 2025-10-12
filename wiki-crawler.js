@@ -54,11 +54,33 @@ async function crawlWikiData() {
 
         const databaseService = new WikiDatabaseService();
 
-        // Step 2: Get all spaces
+        // Step 2: Get all spaces (use simple search instead of getAllSpaces)
         console.log('🔍 Step 2: Getting all spaces...');
-        const spaces = await callMCPTool('confluence_get_all_spaces', {
-            limit: 50
+
+        // Use simple search to get spaces instead of getAllSpaces (which has pagination issues)
+        const searchResult = await callMCPTool('confluence_search', {
+            query: 'type = page',
+            limit: 50  // Smaller limit to avoid MCP errors
         });
+
+        // Extract unique spaces from search results
+        const spaceMap = new Map();
+        if (searchResult.results) {
+            searchResult.results.forEach(result => {
+                if (result.space) {  // Fix: space is at result level, not result.content
+                    const space = result.space;
+                    spaceMap.set(space.key, {
+                        id: 0, // Default ID
+                        key: space.key,
+                        name: space.name,
+                        type: 'space',
+                        status: 'current'
+                    });
+                }
+            });
+        }
+
+        const spaces = Array.from(spaceMap.values());
         console.log(`✅ Found ${spaces.length} spaces.`);
 
         // Log space structure để xem data format
@@ -114,25 +136,30 @@ async function crawlWikiData() {
             console.log(`\n🚀 Crawling space ${space.key} (${space.name})...`);
 
             try {
-                // Get pages from this space using search
+                // Get pages from this space using search (limited for testing)
                 const cqlQuery = `space = "${space.key}" AND type = page`;
                 const searchResult = await callMCPTool('confluence_search', {
                     query: cqlQuery,
-                    limit: 100,
+                    limit: 5,  // Limit to 5 pages per space for testing
                     spaces_filter: space.key
                 });
 
                 const pages = searchResult.results || [];
                 console.log(`   📄 Found ${pages.length} pages in space ${space.key}`);
 
+                // Debug: Log first page structure
+                if (pages.length > 0) {
+                    console.log(`   📋 First page structure:`, JSON.stringify(pages[0], null, 2));
+                }
+
                 if (pages.length === 0) {
                     console.log(`   💤 No pages found for space ${space.key}.`);
                     continue;
                 }
 
-                // Process each page
+                // Process each page: get detailed info, labels, comments, etc.
                 for (const pageResult of pages) {
-                    const wikiPage = pageResult.content;
+                    const wikiPage = pageResult; // Fix: pageResult has id, title, content, etc.
 
                     try {
                         console.log(`\n📦 Processing page: ${wikiPage.title} (${wikiPage.id})`);
@@ -147,11 +174,21 @@ async function crawlWikiData() {
                         console.log(`📦 Raw page data from MCP for ${wikiPage.id}:`);
                         console.log(JSON.stringify(detailedPage, null, 2));
 
+                        // Debug: Check detailedPage structure first
+                        console.log(`🔍 detailedPage structure for ${wikiPage.id}:`);
+                        console.log(`   - Has metadata:`, !!detailedPage.metadata);
+                        console.log(`   - metadata.id:`, detailedPage.metadata?.id);
+                        console.log(`   - metadata.title:`, detailedPage.metadata?.title);
+                        console.log(`   - metadata.url:`, detailedPage.metadata?.url);
+                        console.log(`   - metadata.space:`, detailedPage.metadata?.space);
+
                         // Extract all entities from the page
                         const mappedData = WikiDataMapper.extractAllEntities(detailedPage);
 
                         console.log(`🧭 Mapped data for ${wikiPage.id}:`);
-                        console.log(JSON.stringify(mappedData, null, 2));
+                        console.log(`   - page:`, mappedData.page ? 'defined' : 'undefined');
+                        console.log(`   - users:`, mappedData.users?.length || 0);
+                        console.log(`   - space:`, mappedData.space ? 'defined' : 'undefined');
 
                         // Get additional data if needed
                         let labels = [];
@@ -209,7 +246,13 @@ async function crawlWikiData() {
                             // Save in dependency order
                             await databaseService.saveUsers(allEntities.users);
                             await databaseService.saveSpaces(allEntities.spaces);
-                            await databaseService.savePages(allEntities.pages);
+
+                            // Filter out undefined pages before saving
+                            const validPages = allEntities.pages.filter(p => p !== undefined);
+                            if (validPages.length > 0) {
+                                await databaseService.savePages(validPages);
+                            }
+
                             await databaseService.saveViews(allEntities.views);
                             await databaseService.saveContributors(allEntities.contributors);
                             await databaseService.saveVisitHistories(allEntities.visitHistories);

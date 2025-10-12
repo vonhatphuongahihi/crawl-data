@@ -8,9 +8,9 @@ async function testGetAllPages() {
         await mcpService.connect();
         console.log('🔌 MCP connected');
 
-        // Test 1: Get all pages from all spaces
-        console.log('\n📄 Test 1: Getting ALL pages from ALL spaces...');
-        const allPages = await mcpService.getAllPages(50); // Batch size 50
+        // Test 1: Get limited pages from all spaces (for testing)
+        console.log('\n📄 Test 1: Getting limited pages from ALL spaces...');
+        const allPages = await mcpService.getAllPages(100); // Limit to 100 pages for testing
         console.log(`✅ Found ${allPages.length} total pages from all spaces`);
 
         if (allPages.length > 0) {
