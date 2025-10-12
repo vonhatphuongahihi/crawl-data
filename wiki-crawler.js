@@ -345,14 +345,67 @@ async function crawlWikiData() {
                         let mappedContributors = [];
                         let mappedVisitHistories = [];
 
-                        // Map views data if available
+                        // Map views data if available - get actual user visit history
                         if (pageViews && pageViews.total_views > 0) {
-                            mappedViews = [{
-                                page_id: wikiPage.id,
-                                user_key: 'system', // System view count
-                                total: pageViews.total_views,
-                                last_view: new Date()
-                            }];
+                            // Get detailed visit history from MCP tool
+                            try {
+                                const visitHistoryData = await mcpService.getVisitHistory(wikiPage.id);
+                                console.log(`📊 Visit history data for ${wikiPage.id}:`, JSON.stringify(visitHistoryData, null, 2));
+
+                                // Map visit history to views (each user gets their own view record)
+                                if (visitHistoryData && Array.isArray(visitHistoryData)) {
+                                    mappedViews = visitHistoryData.map(visit => ({
+                                        page_id: wikiPage.id,
+                                        user_key: visit.userKey || visit.username,
+                                        total: visit.views || 1, // Individual user view count
+                                        last_view: new Date(visit.lastVisit || visit.visitDate || new Date())
+                                    }));
+
+                                    // Also map visit histories
+                                    mappedVisitHistories = visitHistoryData.map(visit => ({
+                                        views_id: 0, // Will be linked after views are saved
+                                        visit_date: visit.visitDate || visit.date,
+                                        unix_date: visit.unixDate || new Date(visit.visitDate || visit.date).getTime().toString(),
+                                        visit_id: visit.visitId || Math.floor(Math.random() * 1000000)
+                                    }));
+                                } else {
+                                    // Fallback: create single view record with total views
+                                    let viewUserKey = 'system';
+                                    if (mappedData.users && mappedData.users.length > 0) {
+                                        viewUserKey = mappedData.users[0].user_key;
+                                    } else if (pageCreator?.userKey) {
+                                        viewUserKey = pageCreator.userKey;
+                                    } else if (pageCreator?.username) {
+                                        viewUserKey = pageCreator.username;
+                                    }
+
+                                    mappedViews = [{
+                                        page_id: wikiPage.id,
+                                        user_key: viewUserKey,
+                                        total: pageViews.total_views,
+                                        last_view: new Date()
+                                    }];
+                                }
+                            } catch (visitError) {
+                                console.warn(`⚠️ Could not get visit history for ${wikiPage.id}:`, visitError);
+
+                                // Fallback: create single view record with total views
+                                let viewUserKey = 'system';
+                                if (mappedData.users && mappedData.users.length > 0) {
+                                    viewUserKey = mappedData.users[0].user_key;
+                                } else if (pageCreator?.userKey) {
+                                    viewUserKey = pageCreator.userKey;
+                                } else if (pageCreator?.username) {
+                                    viewUserKey = pageCreator.username;
+                                }
+
+                                mappedViews = [{
+                                    page_id: wikiPage.id,
+                                    user_key: viewUserKey,
+                                    total: pageViews.total_views,
+                                    last_view: new Date()
+                                }];
+                            }
                         }
 
                         // Map contributors from page versions if available
@@ -379,18 +432,31 @@ async function crawlWikiData() {
                             mappedContributors = contributors;
                         }
 
-                        // Map visit history if available
-                        if (visitHistory && Array.isArray(visitHistory)) {
-                            mappedVisitHistories = visitHistory.map(visit => ({
-                                views_id: 0, // Will be linked after views are saved
-                                visit_date: visit.visitDate || visit.date,
-                                unix_date: visit.unixDate || new Date(visit.visitDate || visit.date).getTime().toString()
-                            }));
+                        // Note: Visit history mapping is now handled above in the views section
+
+                        // Extract users from visit history and add to users list
+                        const visitHistoryUsers = [];
+                        if (mappedViews.length > 0) {
+                            for (const view of mappedViews) {
+                                const existingUser = mappedData.users.find(u => u.user_key === view.user_key);
+                                if (!existingUser && view.user_key !== 'system') {
+                                    // Create user from visit history
+                                    visitHistoryUsers.push({
+                                        user_id: view.user_key,
+                                        user_key: view.user_key,
+                                        display_name: view.user_key, // Fallback name
+                                        avatar_url: null,
+                                        roles: '',
+                                        english_name: null,
+                                        is_resigned: false
+                                    });
+                                }
+                            }
                         }
 
                         // Combine all data
                         const allEntities = {
-                            users: mappedData.users,
+                            users: [...mappedData.users, ...visitHistoryUsers], // Include visit history users
                             spaces: mappedData.space ? [mappedData.space] : [],
                             pages: mappedData.page ? [mappedData.page] : [], // Fix: check if page exists
                             views: mappedViews,
