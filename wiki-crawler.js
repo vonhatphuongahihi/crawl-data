@@ -1,6 +1,6 @@
 import MCPWikiService from './dist/services/mcpWikiService.js';
 import WikiDatabaseService from './dist/services/wikiDatabaseService.js';
-import WikiDataMapper from './dist/mappers/wikiDataMapper.js';
+import { WikiDataMapper } from './dist/mappers/wikiDataMapper.js';
 
 let mcpService;
 
@@ -245,6 +245,15 @@ async function crawlWikiData() {
                         // Extract all entities from the page
                         const mappedData = WikiDataMapper.extractAllEntities(transformedPage);
 
+                        // Find created_by_id from users
+                        let createdById = undefined;
+                        if (mappedData.users && mappedData.users.length > 0) {
+                            // Use the first user (creator) as created_by_id
+                            const creator = mappedData.users[0];
+                            // We'll need to save users first to get their database IDs
+                            // For now, we'll handle this in the save order
+                        }
+
                         console.log(`🧭 Mapped data for ${wikiPage.id}:`);
                         console.log(`   - page:`, mappedData.page ? 'defined' : 'undefined');
                         console.log(`   - users:`, mappedData.users?.length || 0);
@@ -282,7 +291,7 @@ async function crawlWikiData() {
 
                         // Map additional data
                         const mappedLabels = WikiDataMapper.mapMultipleLabels(wikiPage.id, labels);
-                        const mappedComments = WikiDataMapper.mapMultipleComments(comments);
+                        const mappedComments = WikiDataMapper.mapMultipleComments(comments, wikiPage.id);
 
                         // Combine all data
                         const allEntities = {
@@ -315,9 +324,21 @@ async function crawlWikiData() {
                             await databaseService.saveUsers(allEntities.users);
                             await databaseService.saveSpaces(allEntities.spaces);
 
-                            // Filter out undefined pages before saving
+                            // Get user map to link created_by_id
+                            const userMap = await databaseService.getWikiUserMapByUserKeys(
+                                allEntities.users.map(u => u.user_key)
+                            );
+
+                            // Update pages with created_by_id
                             const validPages = allEntities.pages.filter(p => p !== undefined);
                             if (validPages.length > 0) {
+                                // Update each page with created_by_id
+                                for (const page of validPages) {
+                                    if (mappedData.users && mappedData.users.length > 0) {
+                                        const creator = mappedData.users[0];
+                                        page.created_by_id = userMap.get(creator.user_key);
+                                    }
+                                }
                                 await databaseService.savePages(validPages);
                             }
 
