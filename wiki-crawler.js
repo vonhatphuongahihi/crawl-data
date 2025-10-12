@@ -175,6 +175,15 @@ async function crawlWikiData() {
                         console.log(`📦 Raw page data from MCP for ${wikiPage.id}:`);
                         console.log(JSON.stringify(detailedPage, null, 2));
 
+                        // Get page creator using NEW MCP tool!
+                        let pageCreator = null;
+                        try {
+                            pageCreator = await mcpService.getPageCreator(wikiPage.id);
+                            console.log(`👤 Page creator from NEW MCP tool:`, JSON.stringify(pageCreator, null, 2));
+                        } catch (creatorError) {
+                            console.warn(`⚠️ Could not get page creator for ${wikiPage.id}:`, creatorError);
+                        }
+
                         // Debug: Check if expand worked
                         console.log(`🔍 EXPAND DEBUG for ${wikiPage.id}:`);
                         console.log(`   - detailedPage.version:`, detailedPage.version);
@@ -219,13 +228,14 @@ async function crawlWikiData() {
                             version: {
                                 number: detailedPage.version?.number,
                                 by: {
-                                    // Now we have real user info from MCP tool!
-                                    displayName: detailedPage.version?.by?.displayName || 'Unknown User',
-                                    accountId: detailedPage.version?.by?.accountId || null,
-                                    email: detailedPage.version?.by?.email || null,
-                                    profilePicture: detailedPage.version?.by?.profilePicture || null,
-                                    isActive: detailedPage.version?.by?.isActive !== false,
-                                    locale: detailedPage.version?.by?.locale || 'en'
+                                    // Use creator info from NEW MCP tool if available, otherwise fallback to version.by
+                                    displayName: pageCreator?.displayName || detailedPage.version?.by?.displayName || 'Unknown User',
+                                    accountId: pageCreator?.accountId || detailedPage.version?.by?.accountId || null,
+                                    userKey: pageCreator?.userKey || detailedPage.version?.by?.userKey || null,
+                                    email: pageCreator?.email || detailedPage.version?.by?.email || null,
+                                    profilePicture: pageCreator?.profilePicture || detailedPage.version?.by?.profilePicture || null,
+                                    isActive: pageCreator?.isActive !== false && detailedPage.version?.by?.isActive !== false,
+                                    locale: pageCreator?.locale || detailedPage.version?.by?.locale || 'en'
                                 },
                                 when: detailedPage.version?.when || detailedPage.created || detailedPage.updated || null
                             },
