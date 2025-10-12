@@ -164,12 +164,12 @@ async function crawlWikiData() {
                     try {
                         console.log(`\n📦 Processing page: ${wikiPage.title} (${wikiPage.id})`);
 
-                        // Get detailed page info with version and history expanded to get user info
+                        // Get detailed page info (MCP tool doesn't support expand parameter)
                         const detailedPage = await callMCPTool('confluence_get_page', {
                             page_id: wikiPage.id,
                             include_metadata: true,
-                            convert_to_markdown: false,
-                            expand: 'version,history,space'  // Try to expand version and history for user info
+                            convert_to_markdown: false
+                            // Note: MCP tool doesn't support expand parameter, only returns metadata
                         });
 
                         console.log(`📦 Raw page data from MCP for ${wikiPage.id}:`);
@@ -208,55 +208,29 @@ async function crawlWikiData() {
                         console.log(`   - Full detailedPage keys:`, Object.keys(detailedPage || {}));
 
                         // Transform MCP response to expected format for mapper
+                        // MCP tool now returns root-level data, not metadata wrapper
                         const transformedPage = {
-                            id: detailedPage.metadata?.id,
-                            title: detailedPage.metadata?.title,
-                            url: detailedPage.metadata?.url,
-                            type: detailedPage.metadata?.type,
-                            status: 'current',
-                            space: detailedPage.metadata?.space,
+                            id: detailedPage.id,
+                            title: detailedPage.title,
+                            url: detailedPage.url,
+                            type: detailedPage.type,
+                            status: detailedPage.status || 'current',
+                            space: detailedPage.space || { key: 'UNKNOWN', name: 'Unknown Space' },
                             version: {
-                                number: detailedPage.metadata?.version,
+                                number: detailedPage.version?.number,
                                 by: {
-                                    // Try to get user info from version.by or history.createdBy
-                                    displayName: detailedPage.version?.by?.displayName ||
-                                        detailedPage.history?.createdBy?.displayName ||
-                                        'Unknown User',
-                                    accountId: detailedPage.version?.by?.accountId ||
-                                        detailedPage.history?.createdBy?.accountId ||
-                                        null,
-                                    accountType: detailedPage.version?.by?.accountType ||
-                                        detailedPage.history?.createdBy?.accountType ||
-                                        'atlassian',
-                                    email: detailedPage.version?.by?.email ||
-                                        detailedPage.history?.createdBy?.email ||
-                                        null,
-                                    publicName: detailedPage.version?.by?.publicName ||
-                                        detailedPage.history?.createdBy?.publicName ||
-                                        'Unknown User',
-                                    userKey: detailedPage.version?.by?.userKey ||
-                                        detailedPage.history?.createdBy?.userKey ||
-                                        null,
-                                    profilePicture: detailedPage.version?.by?.profilePicture ||
-                                        detailedPage.history?.createdBy?.profilePicture ||
-                                        null,
-                                    isExternalCollaborator: detailedPage.version?.by?.isExternalCollaborator ||
-                                        detailedPage.history?.createdBy?.isExternalCollaborator ||
-                                        false,
-                                    isGuest: detailedPage.version?.by?.isGuest ||
-                                        detailedPage.history?.createdBy?.isGuest ||
-                                        false,
-                                    locale: detailedPage.version?.by?.locale ||
-                                        detailedPage.history?.createdBy?.locale ||
-                                        'en',
-                                    accountStatus: detailedPage.version?.by?.accountStatus ||
-                                        detailedPage.history?.createdBy?.accountStatus ||
-                                        'active'
+                                    // Now we have real user info from MCP tool!
+                                    displayName: detailedPage.version?.by?.displayName || 'Unknown User',
+                                    accountId: detailedPage.version?.by?.accountId || null,
+                                    email: detailedPage.version?.by?.email || null,
+                                    profilePicture: detailedPage.version?.by?.profilePicture || null,
+                                    isActive: detailedPage.version?.by?.isActive !== false,
+                                    locale: detailedPage.version?.by?.locale || 'en'
                                 },
-                                when: detailedPage.metadata?.created || detailedPage.metadata?.lastModified || null
+                                when: detailedPage.version?.when || detailedPage.created || detailedPage.updated || null
                             },
                             _links: {
-                                webui: detailedPage.metadata?.url
+                                webui: detailedPage.url
                             }
                         };
 
