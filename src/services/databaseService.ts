@@ -312,7 +312,7 @@ export class DatabaseService {
 
             for (const changelog of changelogs) {
                 await this.insertOrUpdate(connection, 'bts_changelogs', changelog, [
-                    'created', 'author_id', 'items'
+                    'issue_id', 'created', 'author_name', 'author_email', 'items'
                 ]);
             }
 

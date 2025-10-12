@@ -193,10 +193,19 @@ async function crawlCompanyData() {
 
                             await databaseService.saveIssues([mappedData.issue], connection);
 
+                            // Save changelogs (status changes)
+                            if (mappedData.changelogs && mappedData.changelogs.length > 0) {
+                                await databaseService.saveChangelogs(mappedData.changelogs, connection);
+                                console.log(`   📝 Saved ${mappedData.changelogs.length} status change changelogs`);
+                            }
+
                             console.log("💾 Ready to commit these to DB:");
                             console.log("   Users:", mappedData.users.map(u => u.display_name));
                             console.log("   Project:", mappedData.project);
                             console.log("   Issue:", mappedData.issue.key, mappedData.issue.summary);
+                            console.log("   Status:", mappedData.issue.status_name);
+                            console.log("   Resolved Date:", mappedData.issue.resolved_date);
+                            console.log("   Changelogs:", mappedData.changelogs?.length || 0);
 
                             await connection.commit();
                             console.log(`   ✅ Saved issue ${issue.key}`);
