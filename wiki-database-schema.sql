@@ -1,11 +1,11 @@
 -- ================================WIKI DATABASE SCHEMA========================================
 
--- Wiki Users Table
+-- Wiki Users Table (updated for MCP data)
 CREATE TABLE wiki_users (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL UNIQUE,
+    user_id VARCHAR(255) NOT NULL, -- Remove UNIQUE constraint for MCP compatibility
     user_key VARCHAR(255) NOT NULL UNIQUE,
-    display_name VARCHAR(255) NOT NULL,
+    display_name VARCHAR(500) NOT NULL, -- Increase size for longer names
     avatar_url TEXT,
     roles TEXT,
     english_name VARCHAR(255),

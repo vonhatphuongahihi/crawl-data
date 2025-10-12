@@ -11,6 +11,7 @@ export interface WikiPage {
     type: string;
     status: string;
     title: string;
+    url?: string; // Full URL returned by MCP tools
     space?: {
         id: number;
         key: string;
@@ -137,7 +138,7 @@ export interface WikiUser {
 
 export interface WikiSearchResult {
     results: Array<{
-        content: WikiPage;
+        content?: WikiPage;
         title: string;
         excerpt?: string;
         url: string;
@@ -148,6 +149,23 @@ export interface WikiSearchResult {
         lastModified?: string;
         friendlyLastModified?: string;
         score?: number;
+        // MCP returns pages directly with these fields
+        id?: string;
+        type?: string;
+        created?: string;
+        updated?: string;
+        space?: {
+            key: string;
+            name: string;
+            id?: number;
+            type?: string;
+            status?: string;
+        };
+        attachments?: any[];
+        pageContent?: {
+            value: string;
+            format: string;
+        };
     }>;
     start: number;
     limit: number;
@@ -412,12 +430,36 @@ export class MCPWikiService extends EventEmitter {
             throw new Error(response.error || 'Failed to search Confluence');
         }
 
-        console.log(`✅ Search result: ${response.data?.results?.length || 0} items found`);
-        if (response.data?.results?.length > 0) {
-            console.log('📋 First result structure:', JSON.stringify(response.data.results[0], null, 2));
+        // Parse the response data - MCP returns data in different formats
+        let searchData = response.data;
+
+        // If response has result.content with JSON string
+        if (response.data?.result?.content?.[0]?.text) {
+            try {
+                const jsonString = response.data.result.content[0].text;
+                const parsedData = JSON.parse(jsonString);
+                searchData = { results: parsedData };
+                console.log(`✅ Parsed ${parsedData.length} items from JSON string`);
+            } catch (error) {
+                console.error('❌ Failed to parse JSON from MCP response:', error);
+                searchData = { results: [] };
+            }
+        }
+        // If response is array directly
+        else if (Array.isArray(response.data)) {
+            searchData = { results: response.data };
+        }
+        // If response has results field
+        else if (response.data?.results) {
+            searchData = response.data;
         }
 
-        return response.data;
+        console.log(`✅ Search result: ${searchData?.results?.length || 0} items found`);
+        if (searchData?.results?.length > 0) {
+            console.log('📋 First result structure:', JSON.stringify(searchData.results[0], null, 2));
+        }
+
+        return searchData;
     }
 
     // Get specific page by ID
@@ -558,7 +600,7 @@ export class MCPWikiService extends EventEmitter {
         const cqlQuery = `space = "${spaceKey}" AND type = page`;
         const searchResult = await this.searchConfluence(cqlQuery, limit);
 
-        return searchResult.results.map(result => result.content);
+        return searchResult.results.map(result => result.content).filter(Boolean) as WikiPage[];
     }
 
     // Get all spaces (using search with CQL)
@@ -571,22 +613,29 @@ export class MCPWikiService extends EventEmitter {
 
             const spaceMap = new Map<string, WikiSpace>();
 
-            searchResult.results.forEach(result => {
-                if (result.content.space) {
-                    const space = result.content.space;
+            // Handle case where results might be undefined or empty
+            const results = searchResult?.results || [];
+            console.log(`🔍 Processing ${results.length} results for spaces extraction`);
+
+            results.forEach(result => {
+                // MCP returns pages directly, not wrapped in content
+                if (result.space) {
+                    const space = result.space;
                     if (!spaceMap.has(space.key)) {
                         spaceMap.set(space.key, {
-                            id: space.id,
+                            id: typeof space.id === 'number' ? space.id : parseInt(space.key) || 0,
                             key: space.key,
                             name: space.name,
-                            type: space.type,
-                            status: space.status
+                            type: space.type || 'space',
+                            status: space.status || 'current'
                         });
                     }
                 }
             });
 
-            return Array.from(spaceMap.values());
+            const spacesArray = Array.from(spaceMap.values());
+            console.log(`✅ Extracted ${spacesArray.length} unique spaces`);
+            return spacesArray;
         } catch (error) {
             console.error('Error getting spaces:', error);
             return [];

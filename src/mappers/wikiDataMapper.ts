@@ -96,8 +96,8 @@ export class WikiDataMapper {
 
     // Map page from MCP response to database format
     static mapPage(wikiPage: WikiPage, createdById?: number): WikiPageData {
-        const webuiUrl = wikiPage._links?.webui || '';
-        const fullUrl = webuiUrl ? `https://wiki.n.com${webuiUrl}` : '';
+        // MCP tools should return full URL in the response
+        const fullUrl = wikiPage._links?.webui || wikiPage.url || '';
 
         return {
             page_id: wikiPage.id,
