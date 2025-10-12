@@ -167,15 +167,32 @@ export class WikiDataMapper {
     }
 
     // Map comment from MCP response to database format
-    static mapComment(wikiComment: WikiComment): WikiCommentData {
-        const pageId = wikiComment._expandable?.container?.split('/').pop() || '';
+    static mapComment(wikiComment: WikiComment, pageId?: string): WikiCommentData {
+        // Use provided pageId or try to extract from comment data
+        const finalPageId = pageId || wikiComment._expandable?.container?.split('/').pop() || '';
+
+        // Extract body content safely
+        let bodyContent: string | null = null;
+        if (wikiComment.body?.view?.value) {
+            bodyContent = wikiComment.body.view.value;
+        } else if (wikiComment.body?.storage?.value) {
+            bodyContent = wikiComment.body.storage.value;
+        }
+
+        // Extract author safely
+        let authorKey: string | null = null;
+        if (wikiComment.version?.by?.userKey) {
+            authorKey = wikiComment.version.by.userKey;
+        } else if (wikiComment.version?.by?.accountId) {
+            authorKey = wikiComment.version.by.accountId;
+        }
 
         return {
             comment_id: wikiComment.id,
-            page_id: pageId,
+            page_id: finalPageId,
             comment_title: wikiComment.title || null,
-            comment_body: wikiComment.body?.view?.value || wikiComment.body?.storage?.value || null,
-            author_user_key: wikiComment.version?.by?.userKey || wikiComment.version?.by?.accountId || null,
+            comment_body: bodyContent,
+            author_user_key: authorKey,
             created_at: wikiComment.version?.when ? new Date(wikiComment.version.when) : null,
             updated_at: wikiComment.version?.when ? new Date(wikiComment.version.when) : null,
             version_number: wikiComment.version?.number || 1,
@@ -186,11 +203,11 @@ export class WikiDataMapper {
     // Map space from MCP response to database format
     static mapSpace(wikiSpace: WikiSpace): WikiSpaceData {
         return {
-            space_id: wikiSpace.id.toString(),
+            space_id: wikiSpace.id ? wikiSpace.id.toString() : '0', // Fix: handle undefined id
             space_key: wikiSpace.key,
             space_name: wikiSpace.name,
-            space_type: wikiSpace.type,
-            status: wikiSpace.status,
+            space_type: wikiSpace.type || 'global',
+            status: wikiSpace.status || 'current',
             description: null, // Not available in basic space info
             homepage_id: wikiSpace._expandable?.homepage?.split('/').pop() || null
         };
@@ -213,8 +230,8 @@ export class WikiDataMapper {
         return wikiLabels.map(label => this.mapLabel(pageId, label));
     }
 
-    static mapMultipleComments(wikiComments: WikiComment[]): WikiCommentData[] {
-        return wikiComments.map(comment => this.mapComment(comment));
+    static mapMultipleComments(wikiComments: WikiComment[], pageId?: string): WikiCommentData[] {
+        return wikiComments.map(comment => this.mapComment(comment, pageId));
     }
 
     static mapMultipleSpaces(wikiSpaces: WikiSpace[]): WikiSpaceData[] {
