@@ -159,7 +159,7 @@ async function crawlCompanyData() {
                         const detailedIssue = await callMCPTool('jira_get_issue', {
                             issue_key: issue.key,
                             fields: '*all',
-                            expand: 'changelog', // Ensure changelog is expanded
+                            expand: 'changelog,comment', // Ensure changelog and comment are expanded
                             comment_limit: 'all' // Get all comments for this issue
                         });
 

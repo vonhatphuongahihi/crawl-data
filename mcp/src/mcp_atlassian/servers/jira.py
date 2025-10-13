@@ -341,18 +341,17 @@ async def get_worklog(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
 ) -> str:
-    """Get worklog entries for a Jira issue.
+    """Get worklog entries and time tracking info for a Jira issue.
 
     Args:
         ctx: The FastMCP context.
         issue_key: Jira issue key.
 
     Returns:
-        JSON string representing the worklog entries.
+        JSON string representing the worklog entries and time tracking information.
     """
     jira = await get_jira_fetcher(ctx)
-    worklogs = jira.get_worklogs(issue_key)
-    result = {"worklogs": worklogs}
+    result = jira.get_worklogs(issue_key)
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
