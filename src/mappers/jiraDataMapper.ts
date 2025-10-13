@@ -120,29 +120,46 @@ export class JiraDataMapper {
     }
 
     // Map Jira user to database user
-    static mapUser(jiraUser: JiraUser): DatabaseUser {
+    static mapUser(jiraUser: JiraUser, detailedUserProfile?: any): DatabaseUser {
         // Handle company MCP server format where name/email exist
         const userEmail = jiraUser.emailAddress || (jiraUser as any).email;
         const userDisplayName = jiraUser.displayName || jiraUser.name;
 
-        // Extract username from self URL if available
+        // Try to get username from detailed user profile first
         let username = 'unknown';
-        if ((jiraUser as any).self) {
-            const selfUrl = (jiraUser as any).self;
-            const match = selfUrl.match(/username=([^&]+)/);
-            if (match) {
-                username = match[1];
+        if (detailedUserProfile) {
+            // From detailed profile, we should have access to the real username
+            username = detailedUserProfile.name || detailedUserProfile.key || detailedUserProfile.username || 'unknown';
+        } else {
+            // Fallback: Try to extract from avatar_url (ownerId)
+            if ((jiraUser as any).avatar_url) {
+                const avatarUrl = (jiraUser as any).avatar_url;
+                const match = avatarUrl.match(/ownerId=([^&]+)/);
+                if (match) {
+                    username = match[1]; // This will be like "JIRAUSER230164"
+                }
             }
-        }
-
-        // Fallback to name if no URL
-        if (username === 'unknown') {
-            username = (jiraUser as any).name || jiraUser.displayName || 'unknown';
+            
+            // Try to extract from self URL if available
+            if (username === 'unknown' && (jiraUser as any).self) {
+                const selfUrl = (jiraUser as any).self;
+                const match = selfUrl.match(/username=([^&]+)/);
+                if (match) {
+                    username = match[1];
+                }
+            }
+            
+            // Final fallback
+            if (username === 'unknown') {
+                username = (jiraUser as any).name || jiraUser.displayName || 'unknown';
+            }
         }
 
         console.log('🔍 mapUser debug:', {
             jiraUser: jiraUser,
+            detailedUserProfile: detailedUserProfile,
             selfUrl: (jiraUser as any).self,
+            avatarUrl: (jiraUser as any).avatar_url,
             extractedUsername: username,
             extractedEmail: userEmail,
             extractedDisplayName: userDisplayName

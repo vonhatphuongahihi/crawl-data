@@ -343,18 +343,6 @@ export class MCPJiraService extends EventEmitter {
         return response.data || [];
     }
 
-    // Get user profile
-    async getUserProfile(userIdentifier: string): Promise<JiraUser> {
-        const response = await this.makeRequest('jira_get_user_profile', {
-            user_identifier: userIdentifier
-        });
-
-        if (!response.success) {
-            throw new Error(response.error || 'Failed to get user profile');
-        }
-
-        return response.data;
-    }
 
     // Search issues with JQL
     async searchIssues(
@@ -437,6 +425,19 @@ export class MCPJiraService extends EventEmitter {
 
         if (!response.success) {
             throw new Error(response.error || 'Failed to get issue comments');
+        }
+
+        return response.data;
+    }
+
+    // Get user profile by identifier
+    async getUserProfile(identifier: string): Promise<any> {
+        const response = await this.makeRequest('jira_get_user_profile', {
+            identifier: identifier
+        });
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to get user profile');
         }
 
         return response.data;

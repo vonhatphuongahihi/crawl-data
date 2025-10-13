@@ -1652,3 +1652,35 @@ async def batch_create_versions(
             )
             results.append({"success": False, "error": str(e), "input": v})
     return json.dumps(results, indent=2, ensure_ascii=False)
+
+
+@jira_mcp.tool(tags={"jira", "read"})
+async def get_user_profile(
+    ctx: Context,
+    identifier: Annotated[
+        str,
+        Field(
+            description="User identifier (accountId, username, key, or email)"
+        ),
+    ],
+) -> str:
+    """Get detailed user profile information by identifier.
+
+    Args:
+        ctx: The FastMCP context.
+        identifier: User identifier (accountId, username, key, or email).
+
+    Returns:
+        JSON string representing the user profile.
+    """
+    jira = await get_jira_fetcher(ctx)
+    try:
+        user_profile = jira.get_user_profile_by_identifier(identifier)
+        return json.dumps(user_profile, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error getting user profile for {identifier}: {e}")
+        return json.dumps(
+            {"error": f"Failed to get user profile: {e}"},
+            indent=2,
+            ensure_ascii=False,
+        )
