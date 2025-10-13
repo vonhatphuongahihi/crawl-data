@@ -23,6 +23,8 @@ async function callMCPTool(toolName, params) {
             return await mcpService.getProjectIssues(params.project_key, params.limit, params.start_at);
         case 'jira_get_issue':
             return await mcpService.getIssue(params.issue_key, params.fields, params.expand);
+        case 'jira_get_issue_comments':
+            return await mcpService.getIssueComments(params.issue_key, params.limit);
         default:
             throw new Error(`Unknown tool: ${toolName}`);
     }
@@ -159,18 +161,29 @@ async function crawlCompanyData() {
                         const detailedIssue = await callMCPTool('jira_get_issue', {
                             issue_key: issue.key,
                             fields: '*all',
-                            expand: 'changelog,comment', // Ensure changelog and comment are expanded
-                            comment_limit: 'all' // Get all comments for this issue
+                            expand: 'changelog' // Only expand changelog
                         });
 
                         console.log(`\n📦 Raw issue data from MCP for ${issue.key}:`);
                         console.log(JSON.stringify(detailedIssue, null, 2));
 
-                        // Extract comments from the issue response
+                        // Get comments separately using dedicated tool
                         let comments = [];
-                        if (detailedIssue.fields && detailedIssue.fields.comment && detailedIssue.fields.comment.comments) {
-                            comments = detailedIssue.fields.comment.comments;
-                            console.log(`💬 Found ${comments.length} comments in issue response for ${issue.key}`);
+                        try {
+                            console.log(`💬 Getting comments for ${issue.key}...`);
+                            const commentsResponse = await callMCPTool('jira_get_issue_comments', {
+                                issue_key: issue.key,
+                                limit: 1000 // Get all comments
+                            });
+
+                            if (Array.isArray(commentsResponse)) {
+                                comments = commentsResponse;
+                                console.log(`💬 Found ${comments.length} comments for ${issue.key}`);
+                            } else {
+                                console.log(`💬 No comments found for ${issue.key}`);
+                            }
+                        } catch (commentError) {
+                            console.log(`💬 Error getting comments for ${issue.key}:`, commentError.message);
                         }
 
                         const mappedData = JiraDataMapper.extractAllEntities(detailedIssue, comments);

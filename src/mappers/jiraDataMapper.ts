@@ -66,7 +66,6 @@ export interface DatabaseIssue {
     labels?: string; // JSON string
     subtasks?: string; // JSON string
     changelog?: string | null; // JSON string - store changelog data, can be null
-    original_estimate?: string; // Time tracking original estimate
 }
 
 export interface DatabaseChangelog {
@@ -241,25 +240,6 @@ export class JiraDataMapper {
             }
         }
 
-        // Extract time tracking information from multiple sources
-        const timeTracking = fields.timetracking || {};
-        let originalEstimate = timeTracking.originalEstimate || timeTracking.originalEstimateSeconds;
-
-        // If not found in timetracking, check changelog for timeoriginalestimate
-        if (!originalEstimate && jiraIssue.changelogs) {
-            for (const changelog of jiraIssue.changelogs) {
-                if (changelog.items && Array.isArray(changelog.items)) {
-                    for (const item of changelog.items) {
-                        if (item.field === 'timeoriginalestimate' && item.to_string) {
-                            originalEstimate = item.to_string;
-                            break;
-                        }
-                    }
-                }
-                if (originalEstimate) break;
-            }
-        }
-
         const result: DatabaseIssue = {
             id: this.nullify(jiraIssue.id) || `issue_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             key: this.nullify(jiraIssue.key),
@@ -277,8 +257,7 @@ export class JiraDataMapper {
             priority_name: this.nullify(fields.priority?.name),
             labels: this.nullify(JSON.stringify(fields.labels || [])),
             subtasks: this.nullify(JSON.stringify(fields.subtasks || [])),
-            changelog: null, // Remove changelog from issues table - will be handled separately
-            original_estimate: this.nullify(originalEstimate)
+            changelog: null // Remove changelog from issues table - will be handled separately
         };
 
         // Handle assignee - check both fields.assignee and direct jiraIssue.assignee

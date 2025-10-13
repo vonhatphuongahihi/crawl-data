@@ -428,6 +428,20 @@ export class MCPJiraService extends EventEmitter {
         return response.data;
     }
 
+    // Get comments for issue
+    async getIssueComments(issueKey: string, limit: number = 50): Promise<any[]> {
+        const response = await this.makeRequest('jira_get_issue_comments', {
+            issue_key: issueKey,
+            limit: limit
+        });
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to get issue comments');
+        }
+
+        return response.data;
+    }
+
     // Get transitions for issue
     async getTransitions(issueKey: string): Promise<any[]> {
         const response = await this.makeRequest('jira_get_transitions', {

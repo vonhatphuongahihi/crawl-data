@@ -255,9 +255,7 @@ export class MCPJiraCrawler {
 
         // Process changelog if requested
         if (this.config.includeChangelog && (detailedIssue as any).changelog) {
-            const changelogs = (detailedIssue as any).changelog.histories.map((history: any) =>
-                JiraDataMapper.mapChangelog(history, detailedIssue.id)
-            );
+            const changelogs = JiraDataMapper.extractStatusChangeChangelogs(detailedIssue);
             await this.databaseService.saveChangelogs(changelogs);
         }
 

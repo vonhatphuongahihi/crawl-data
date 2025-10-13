@@ -356,6 +356,35 @@ async def get_worklog(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+async def get_issue_comments(
+    ctx: Context,
+    issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
+    limit: Annotated[
+        int,
+        Field(
+            description="Maximum number of comments to return (1-1000)",
+            default=50,
+            ge=1,
+            le=1000,
+        ),
+    ] = 50,
+) -> str:
+    """Get comments for a specific Jira issue.
+
+    Args:
+        ctx: The FastMCP context.
+        issue_key: Jira issue key.
+        limit: Maximum number of comments to return.
+
+    Returns:
+        JSON string representing the comments for the issue.
+    """
+    jira = await get_jira_fetcher(ctx)
+    comments = jira.get_issue_comments(issue_key, limit)
+    return json.dumps(comments, indent=2, ensure_ascii=False)
+
+
+@jira_mcp.tool(tags={"jira", "read"})
 async def download_attachments(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
