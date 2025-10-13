@@ -139,7 +139,7 @@ export class JiraDataMapper {
                     username = match[1]; // This will be like "JIRAUSER230164"
                 }
             }
-            
+
             // Try to extract from self URL if available
             if (username === 'unknown' && (jiraUser as any).self) {
                 const selfUrl = (jiraUser as any).self;
@@ -148,7 +148,7 @@ export class JiraDataMapper {
                     username = match[1];
                 }
             }
-            
+
             // Final fallback
             if (username === 'unknown') {
                 username = (jiraUser as any).name || jiraUser.displayName || 'unknown';

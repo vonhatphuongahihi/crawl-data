@@ -1684,3 +1684,46 @@ async def get_user_profile(
             indent=2,
             ensure_ascii=False,
         )
+
+
+@jira_mcp.tool(tags={"jira", "read"})
+async def search_users(
+    ctx: Context,
+    username: Annotated[
+        str,
+        Field(
+            description="Username to search for (e.g., 'NVN10356')"
+        ),
+    ],
+    limit: Annotated[
+        int,
+        Field(
+            description="Maximum number of users to return",
+            default=10,
+            ge=1,
+            le=100
+        ),
+    ] = 10,
+) -> str:
+    """Search for users by username using /user/search endpoint.
+
+    Args:
+        ctx: The FastMCP context.
+        username: Username to search for.
+        limit: Maximum number of users to return.
+
+    Returns:
+        JSON string representing the search results.
+    """
+    jira = await get_jira_fetcher(ctx)
+    try:
+        # Use the search endpoint that works with username
+        response = jira.jira.user_find_by_user_string(username=username, start=0, limit=limit)
+        return json.dumps(response, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error searching users for {username}: {e}")
+        return json.dumps(
+            {"error": f"Failed to search users: {e}"},
+            indent=2,
+            ensure_ascii=False,
+        )

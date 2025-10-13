@@ -443,6 +443,20 @@ export class MCPJiraService extends EventEmitter {
         return response.data;
     }
 
+    // Search users by username
+    async searchUsers(username: string, limit: number = 10): Promise<any[]> {
+        const response = await this.makeRequest('jira_search_users', {
+            username: username,
+            limit: limit
+        });
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to search users');
+        }
+
+        return response.data;
+    }
+
     // Get transitions for issue
     async getTransitions(issueKey: string): Promise<any[]> {
         const response = await this.makeRequest('jira_get_transitions', {
