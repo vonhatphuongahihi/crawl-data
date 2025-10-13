@@ -159,13 +159,21 @@ async function crawlCompanyData() {
                         const detailedIssue = await callMCPTool('jira_get_issue', {
                             issue_key: issue.key,
                             fields: '*all',
-                            expand: 'changelog'
+                            expand: 'changelog', // Ensure changelog is expanded
+                            comment_limit: 'all' // Get all comments for this issue
                         });
 
                         console.log(`\n📦 Raw issue data from MCP for ${issue.key}:`);
                         console.log(JSON.stringify(detailedIssue, null, 2));
 
-                        const mappedData = JiraDataMapper.extractAllEntities(detailedIssue);
+                        // Extract comments from the issue response
+                        let comments = [];
+                        if (detailedIssue.fields && detailedIssue.fields.comment && detailedIssue.fields.comment.comments) {
+                            comments = detailedIssue.fields.comment.comments;
+                            console.log(`💬 Found ${comments.length} comments in issue response for ${issue.key}`);
+                        }
+
+                        const mappedData = JiraDataMapper.extractAllEntities(detailedIssue, comments);
 
                         // Fix project_id in issue to use real project ID from database
                         mappedData.issue.project_id = project.id;
@@ -199,6 +207,12 @@ async function crawlCompanyData() {
                                 console.log(`   📝 Saved ${mappedData.changelogs.length} status change changelogs`);
                             }
 
+                            // Save comments
+                            if (mappedData.comments && mappedData.comments.length > 0) {
+                                await databaseService.saveComments(mappedData.comments, connection);
+                                console.log(`   💬 Saved ${mappedData.comments.length} comments`);
+                            }
+
                             console.log("💾 Ready to commit these to DB:");
                             console.log("   Users:", mappedData.users.map(u => u.display_name));
                             console.log("   Project:", mappedData.project);
@@ -206,6 +220,7 @@ async function crawlCompanyData() {
                             console.log("   Status:", mappedData.issue.status_name);
                             console.log("   Resolved Date:", mappedData.issue.resolved_date);
                             console.log("   Changelogs:", mappedData.changelogs?.length || 0);
+                            console.log("   Comments:", mappedData.comments?.length || 0);
 
                             await connection.commit();
                             console.log(`   ✅ Saved issue ${issue.key}`);

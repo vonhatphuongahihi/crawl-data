@@ -99,6 +99,19 @@ export interface DatabaseIssueFixVersion {
     fix_version_id: string;
 }
 
+export interface DatabaseComment {
+    id?: number; // AUTO_INCREMENT, optional for inserts
+    issue_id: string;
+    comment_id: string; // Jira comment ID
+    author_name: string;
+    author_email: string;
+    body: string;
+    created: Date;
+    updated: Date;
+    created_at?: Date; // TIMESTAMP, auto-generated
+    updated_at?: Date; // TIMESTAMP, auto-generated
+}
+
 export class JiraDataMapper {
     // Helper function to convert undefined to null for MySQL compatibility
     private static nullify(value: any): any {
@@ -337,14 +350,33 @@ export class JiraDataMapper {
         );
     }
 
+    // Map Jira comment to database comment
+    static mapComment(jiraComment: any, issueId: string): DatabaseComment {
+        return {
+            issue_id: issueId,
+            comment_id: jiraComment.id,
+            author_name: jiraComment.author?.displayName || jiraComment.author?.name || 'Unknown',
+            author_email: jiraComment.author?.emailAddress || jiraComment.author?.email || '',
+            body: jiraComment.body || '',
+            created: new Date(jiraComment.created),
+            updated: new Date(jiraComment.updated)
+        };
+    }
+
+    // Map multiple Jira comments to database comments
+    static mapMultipleComments(jiraComments: any[], issueId: string): DatabaseComment[] {
+        return jiraComments.map(comment => this.mapComment(comment, issueId));
+    }
+
     // Extract all entities from a Jira issue
-    static extractAllEntities(jiraIssue: any) {
+    static extractAllEntities(jiraIssue: any, comments?: any[]) {
         const entities = {
             issue: this.mapIssue(jiraIssue),
             labels: this.mapLabels(jiraIssue),
             components: this.mapIssueComponents(jiraIssue),
             issueFixVersions: this.mapIssueFixVersions(jiraIssue),
-            changelogs: this.extractStatusChangeChangelogs(jiraIssue)
+            changelogs: this.extractStatusChangeChangelogs(jiraIssue),
+            comments: comments ? this.mapMultipleComments(comments, jiraIssue.id) : []
         };
 
         // Handle both formats: with fields wrapper and without

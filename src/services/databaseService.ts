@@ -8,6 +8,7 @@ import {
     DatabaseFixVersion,
     DatabaseIssue,
     DatabaseChangelog,
+    DatabaseComment,
     DatabaseSubtask,
     DatabaseLabel,
     DatabaseIssueFixVersion
@@ -456,6 +457,31 @@ export class DatabaseService {
 
             const issues = rows as DatabaseIssue[];
             return issues.length > 0 ? issues[0] || null : null;
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Save comments
+    async saveComments(comments: DatabaseComment[]): Promise<void> {
+        if (comments.length === 0) return;
+
+        const connection = await this.pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            for (const comment of comments) {
+                await this.insertOrUpdate(connection, 'bts_comments', comment, [
+                    'issue_id', 'comment_id', 'author_name', 'author_email', 'body', 'created', 'updated'
+                ]);
+            }
+
+            await connection.commit();
+            console.log(`Saved ${comments.length} comments to database`);
+        } catch (error) {
+            await connection.rollback();
+            console.error('Error saving comments:', error);
+            throw error;
         } finally {
             connection.release();
         }
