@@ -167,6 +167,14 @@ async function crawlCompanyData() {
                         console.log(`\n📦 Raw issue data from MCP for ${issue.key}:`);
                         console.log(JSON.stringify(detailedIssue, null, 2));
 
+                        // Debug user data structure
+                        if (detailedIssue.assignee) {
+                            console.log('Assignee structure:', JSON.stringify(detailedIssue.assignee, null, 2));
+                        }
+                        if (detailedIssue.reporter) {
+                            console.log('Reporter structure:', JSON.stringify(detailedIssue.reporter, null, 2));
+                        }
+
                         // Get comments separately using dedicated tool
                         let comments = [];
                         try {
@@ -175,6 +183,8 @@ async function crawlCompanyData() {
                                 issue_key: issue.key,
                                 limit: 1000 // Get all comments
                             });
+
+                            console.log('Raw comments response:', JSON.stringify(commentsResponse, null, 2));
 
                             if (Array.isArray(commentsResponse)) {
                                 comments = commentsResponse;
