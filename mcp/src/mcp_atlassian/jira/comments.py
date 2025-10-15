@@ -38,12 +38,16 @@ class CommentsMixin(JiraClient):
 
             processed_comments = []
             for comment in comments.get("comments", [])[:limit]:
+                author_info = comment.get("author", {})
                 processed_comment = {
                     "id": comment.get("id"),
                     "body": self._clean_text(comment.get("body", "")),
                     "created": str(parse_date(comment.get("created"))),
                     "updated": str(parse_date(comment.get("updated"))),
-                    "author": comment.get("author", {}).get("displayName", "Unknown"),
+                    "author_display_name": author_info.get("displayName", "Unknown"),
+                    "author_code": author_info.get("name", author_info.get("key", "Unknown")),
+                    "author_email": author_info.get("emailAddress", ""),
+                    "author_avatar_url": author_info.get("avatarUrls", {}).get("48x48", ""),
                 }
                 processed_comments.append(processed_comment)
 

@@ -21,6 +21,15 @@ export interface WikiPage {
         type: string;
         status: string;
     };
+    author?: {
+        displayName?: string;
+        accountId?: string;
+        userKey?: string;
+        email?: string;
+        profilePicture?: any;
+        isActive?: boolean;
+        locale?: string;
+    };
     version?: {
         by: {
             type: string;

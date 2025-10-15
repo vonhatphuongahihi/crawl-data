@@ -129,7 +129,8 @@ export class WikiDatabaseService {
 
             for (const page of pages) {
                 await this.insertOrUpdate(connection, 'wiki_pages', page, [
-                    'title', 'url', 'views', 'last_modified_by', 'number_of_versions',
+                    'title', 'url', 'views', 'last_modified_by', 'last_modified_by_key',
+                    'created_by_display_name', 'created_by_key', 'number_of_versions',
                     'parent_page_ids', 'created_by_id', 'created_at', 'nearest_parent_id',
                     'space_key', 'content_type', 'status', 'version_number', 'last_modified_at'
                 ]);

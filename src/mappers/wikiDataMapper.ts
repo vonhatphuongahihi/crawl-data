@@ -16,6 +16,9 @@ export interface WikiPageData {
     url: string;
     views: number;
     last_modified_by: string;
+    last_modified_by_key?: string | null; // Add user key field
+    created_by_display_name?: string | null; // Add creator display name
+    created_by_key?: string | null; // Add creator user key
     number_of_versions: number;
     parent_page_ids?: string | null;
     created_by_id?: number | null;
@@ -130,6 +133,9 @@ export class WikiDataMapper {
             url: fullUrl,
             views: (wikiPage as any).views || 0, // Use views from MCP tool
             last_modified_by: wikiPage.version?.by?.displayName || '',
+            last_modified_by_key: wikiPage.version?.by?.userKey || wikiPage.version?.by?.accountId || null, // Add user key
+            created_by_display_name: wikiPage.author?.displayName || '', // Add creator display name
+            created_by_key: wikiPage.author?.userKey || wikiPage.author?.accountId || null, // Add creator user key
             number_of_versions: wikiPage.version?.number || 1,
             parent_page_ids: parentPageIds, // Now populated from ancestors
             created_by_id: createdById || null,

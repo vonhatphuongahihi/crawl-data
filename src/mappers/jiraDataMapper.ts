@@ -104,7 +104,8 @@ export interface DatabaseComment {
     id?: number; // AUTO_INCREMENT, optional for inserts
     issue_id: string;
     comment_id: string; // Jira comment ID
-    author_name: string;
+    author_name: string; // Display name
+    author_code: string; // Username (NVN10356)
     author_email: string;
     body: string;
     created: Date;
@@ -131,21 +132,12 @@ export class JiraDataMapper {
             // From detailed profile, we should have access to the real username
             username = detailedUserProfile.name || detailedUserProfile.key || detailedUserProfile.username || 'unknown';
         } else {
-            // Fallback: Try to extract from avatar_url (ownerId)
+            // Use ownerId from avatar_url as username (most reliable)
             if ((jiraUser as any).avatar_url) {
                 const avatarUrl = (jiraUser as any).avatar_url;
                 const match = avatarUrl.match(/ownerId=([^&]+)/);
                 if (match) {
                     username = match[1]; // This will be like "JIRAUSER230164"
-                }
-            }
-
-            // Try to extract from self URL if available
-            if (username === 'unknown' && (jiraUser as any).self) {
-                const selfUrl = (jiraUser as any).self;
-                const match = selfUrl.match(/username=([^&]+)/);
-                if (match) {
-                    username = match[1];
                 }
             }
 
@@ -397,8 +389,9 @@ export class JiraDataMapper {
         return {
             issue_id: issueId,
             comment_id: jiraComment.id,
-            author_name: jiraComment.author?.displayName || jiraComment.author?.name || 'Unknown',
-            author_email: jiraComment.author?.emailAddress || jiraComment.author?.email || '',
+            author_name: jiraComment.author_display_name || jiraComment.author?.displayName || 'Unknown', // Display name
+            author_code: jiraComment.author_code || jiraComment.author?.name || jiraComment.author?.key || 'Unknown', // Username (NVN10356)
+            author_email: jiraComment.author_email || jiraComment.author?.emailAddress || jiraComment.author?.email || '',
             body: jiraComment.body || '',
             created: new Date(jiraComment.created),
             updated: new Date(jiraComment.updated)
@@ -411,7 +404,7 @@ export class JiraDataMapper {
     }
 
     // Extract all entities from a Jira issue
-    static extractAllEntities(jiraIssue: any, comments?: any[]) {
+    static extractAllEntities(jiraIssue: any, comments?: any[], userProfiles?: Map<string, any>) {
         const entities = {
             issue: this.mapIssue(jiraIssue),
             labels: this.mapLabels(jiraIssue),
@@ -428,11 +421,15 @@ export class JiraDataMapper {
         const users: DatabaseUser[] = [];
         const assignee = fields.assignee || jiraIssue.assignee;
         if (assignee) {
-            users.push(this.mapUser(assignee));
+            const assigneeKey = assignee.email || assignee.emailAddress;
+            const detailedProfile = userProfiles?.get(assigneeKey);
+            users.push(this.mapUser(assignee, detailedProfile));
         }
         const reporter = fields.reporter || jiraIssue.reporter;
         if (reporter) {
-            users.push(this.mapUser(reporter));
+            const reporterKey = reporter.email || reporter.emailAddress;
+            const detailedProfile = userProfiles?.get(reporterKey);
+            users.push(this.mapUser(reporter, detailedProfile));
         }
 
         // Extract project - handle case where project might not exist

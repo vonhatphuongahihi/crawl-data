@@ -239,6 +239,7 @@ async def get_page(
                 "by": {
                     "displayName": page_object.version.by.display_name if page_object.version and page_object.version.by else None,
                     "accountId": page_object.version.by.account_id if page_object.version and page_object.version.by else None,
+                    "userKey": page_object.version.by.user_key if page_object.version and page_object.version.by else None,
                     "email": page_object.version.by.email if page_object.version and page_object.version.by else None,
                     "profilePicture": page_object.version.by.profile_picture if page_object.version and page_object.version.by else None,
                     "isActive": page_object.version.by.is_active if page_object.version and page_object.version.by else None,
@@ -248,6 +249,7 @@ async def get_page(
             "author": {
                 "displayName": page_object.author.display_name if page_object.author else None,
                 "accountId": page_object.author.account_id if page_object.author else None,
+                "userKey": page_object.author.user_key if page_object.author else None,
                 "email": page_object.author.email if page_object.author else None,
                 "profilePicture": page_object.author.profile_picture if page_object.author else None,
                 "isActive": page_object.author.is_active if page_object.author else None,

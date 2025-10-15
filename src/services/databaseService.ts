@@ -472,7 +472,7 @@ export class DatabaseService {
 
             for (const comment of comments) {
                 await this.insertOrUpdate(connection, 'bts_comments', comment, [
-                    'issue_id', 'comment_id', 'author_name', 'author_email', 'body', 'created', 'updated'
+                    'issue_id', 'comment_id', 'author_name', 'author_code', 'author_email', 'body', 'created', 'updated'
                 ]);
             }
 

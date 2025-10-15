@@ -562,25 +562,48 @@ async function crawlWikiData() {
                         // Map contributors from page versions if available
                         if (pageVersions) {
                             const contributors = [];
-                            // Add creator
-                            if (pageVersions.createdBy) {
+
+                            // Handle different response structures from MCP tool
+                            if (pageVersions.results && Array.isArray(pageVersions.results)) {
+                                // MCP tool returns {results: [...]} format
+                                pageVersions.results.forEach(version => {
+                                    if (version.by) {
+                                        contributors.push({
+                                            create_by_user_key: version.by.userKey || version.by.username || version.by.accountId,
+                                            confluence_page_id: wikiPage.id,
+                                            version: version.number || 1,
+                                            when_modified: new Date(version.when),
+                                            message: version.message || null,
+                                            minor_edit: version.minorEdit || false
+                                        });
+                                    }
+                                });
+                            } else if (pageVersions.createdBy) {
+                                // Legacy format from api.ts 
                                 contributors.push({
                                     create_by_user_key: pageVersions.createdBy.userKey || pageVersions.createdBy.username,
                                     confluence_page_id: wikiPage.id,
                                     version: 1,
-                                    when_modified: new Date(pageVersions.createdDate)
+                                    when_modified: new Date(pageVersions.createdDate),
+                                    message: null,
+                                    minor_edit: false
                                 });
                             }
-                            // Add last updater
-                            if (pageVersions.lastUpdated) {
+
+                            // Add last updater if different from creator
+                            if (pageVersions.lastUpdated && pageVersions.lastUpdated.by) {
                                 contributors.push({
-                                    create_by_user_key: pageVersions.lastUpdated.by.userKey || pageVersions.lastUpdated.by.username,
+                                    create_by_user_key: pageVersions.lastUpdated.by.userKey || pageVersions.lastUpdated.by.username || pageVersions.lastUpdated.by.accountId,
                                     confluence_page_id: wikiPage.id,
-                                    version: pageVersions.lastUpdated.number,
-                                    when_modified: new Date(pageVersions.lastUpdated.when)
+                                    version: pageVersions.lastUpdated.number || 1,
+                                    when_modified: new Date(pageVersions.lastUpdated.when),
+                                    message: pageVersions.lastUpdated.message || null,
+                                    minor_edit: pageVersions.lastUpdated.minorEdit || false
                                 });
                             }
+
                             mappedContributors = contributors;
+                            console.log(`📚 Mapped ${contributors.length} contributors from page versions`);
                         }
 
                         // Note: Visit history mapping is now handled above in the views section

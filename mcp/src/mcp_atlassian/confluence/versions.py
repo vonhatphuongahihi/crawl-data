@@ -44,7 +44,17 @@ class VersionsMixin(ConfluenceClient):
             )
 
             if response:
-                logger.info(f"Successfully retrieved {len(response.get('results', []))} versions for page {page_id}")
+                # Transform the response to include userKey in each version's by field
+                results = response.get('results', [])
+                for version in results:
+                    if version.get('by'):
+                        by_info = version['by']
+                        # Extract userKey from accountId or other fields if available
+                        user_key = by_info.get('userKey') or by_info.get('accountId')
+                        if user_key:
+                            by_info['userKey'] = user_key
+                
+                logger.info(f"Successfully retrieved {len(results)} versions for page {page_id}")
                 return response
             else:
                 logger.warning(f"No versions found for page {page_id}")
@@ -88,6 +98,14 @@ class VersionsMixin(ConfluenceClient):
             )
 
             if response:
+                # Transform the response to include userKey in the by field
+                if response.get('by'):
+                    by_info = response['by']
+                    # Extract userKey from accountId or other fields if available
+                    user_key = by_info.get('userKey') or by_info.get('accountId')
+                    if user_key:
+                        by_info['userKey'] = user_key
+                
                 logger.info(f"Successfully retrieved version {version_number} for page {page_id}")
                 return response
             else:
