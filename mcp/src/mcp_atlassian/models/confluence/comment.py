@@ -84,6 +84,12 @@ class ConfluenceComment(ApiModel, TimestampMixin):
             result["title"] = self.title
 
         if self.author:
-            result["author"] = self.author.display_name
+            result["author"] = {
+                "display_name": self.author.display_name,
+                "user_key": self.author.user_key,
+                "username": self.author.username,  # Add username
+                "account_id": self.author.account_id,
+                "email": self.author.email
+            }
 
         return result

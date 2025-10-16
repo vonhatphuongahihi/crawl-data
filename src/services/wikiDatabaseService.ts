@@ -264,7 +264,7 @@ export class WikiDatabaseService {
 
             for (const comment of comments) {
                 await this.insertOrUpdate(connection, 'wiki_comments', comment, [
-                    'comment_title', 'comment_body', 'author_user_key', 'created_at',
+                    'comment_title', 'comment_body', 'author_user_key', 'assignee_code', 'display_name', 'created_at',
                     'updated_at', 'version_number', 'status'
                 ]);
             }

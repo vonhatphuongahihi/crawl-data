@@ -82,13 +82,11 @@ export interface WikiComment {
     created: string; // Direct created timestamp
     updated: string; // Direct updated timestamp
     author?: {
-        type: string;
-        accountId: string;
-        accountType: string;
-        email?: string;
-        publicName: string;
         displayName: string;
         userKey?: string;
+        username?: string;  // Add username field
+        accountId?: string;
+        email?: string;
     };
     version?: {
         by: {

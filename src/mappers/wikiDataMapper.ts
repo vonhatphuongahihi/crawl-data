@@ -67,6 +67,8 @@ export interface WikiCommentData {
     comment_title?: string | null;
     comment_body?: string | null;
     author_user_key?: string | null;
+    assignee_code?: string | null; // username goes here
+    display_name?: string | null; // Add display_name field
     created_at?: Date | null;
     updated_at?: Date | null;
     version_number: number;
@@ -234,12 +236,29 @@ export class WikiDataMapper {
             updatedAt = new Date(wikiComment.version.when);
         }
 
+        // Extract username for assignee_code
+        let assigneeCode: string | null = null;
+        if (wikiComment.author?.username) {
+            assigneeCode = wikiComment.author.username; // username goes to assignee_code
+        } else if (wikiComment.author?.userKey) {
+            assigneeCode = wikiComment.author.userKey;
+        } else if (wikiComment.author?.accountId) {
+            assigneeCode = wikiComment.author.accountId;
+        } else if (authorKey) {
+            assigneeCode = authorKey;
+        }
+
+        // Extract display_name from author
+        const displayName = wikiComment.author?.displayName || null;
+
         return {
             comment_id: wikiComment.id,
             page_id: finalPageId,
             comment_title: wikiComment.title || null,
             comment_body: bodyContent,
             author_user_key: authorKey,
+            assignee_code: assigneeCode, // username goes here
+            display_name: displayName, // Add display_name field
             created_at: createdAt,
             updated_at: updatedAt,
             version_number: wikiComment.version?.number || 1,

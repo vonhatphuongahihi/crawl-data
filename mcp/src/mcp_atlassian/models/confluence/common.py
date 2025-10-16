@@ -22,6 +22,8 @@ class ConfluenceUser(ApiModel):
     """
 
     account_id: str | None = None
+    user_key: str | None = None  # Add userKey field
+    username: str | None = None  # Add username field
     display_name: str = UNASSIGNED
     email: str | None = None
     profile_picture: str | None = None
@@ -63,6 +65,8 @@ class ConfluenceUser(ApiModel):
 
         return cls(
             account_id=data.get("accountId"),
+            user_key=data.get("userKey"),  # Add userKey extraction
+            username=data.get("username"),  # Add username extraction
             display_name=data.get("displayName", UNASSIGNED),
             email=data.get("email"),
             profile_picture=profile_pic,
@@ -74,6 +78,8 @@ class ConfluenceUser(ApiModel):
         """Convert to simplified dictionary for API response."""
         return {
             "display_name": self.display_name,
+            "user_key": self.user_key,  # Add userKey to output
+            "username": self.username,  # Add username to output
             "email": self.email,
             "profile_picture": self.profile_picture,
         }
