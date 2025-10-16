@@ -25,6 +25,7 @@ export interface WikiPage {
         displayName?: string;
         accountId?: string;
         userKey?: string;
+        username?: string;
         email?: string;
         profilePicture?: any;
         isActive?: boolean;
@@ -82,10 +83,10 @@ export interface WikiComment {
     created: string; // Direct created timestamp
     updated: string; // Direct updated timestamp
     author?: {
-        displayName: string;
-        userKey?: string;
-        username?: string;  // Add username field
-        accountId?: string;
+        display_name: string;  // Fix: match MCP response field name
+        user_key?: string;     // Fix: match MCP response field name
+        username?: string;
+        account_id?: string;   // Fix: match MCP response field name
         email?: string;
     };
     version?: {

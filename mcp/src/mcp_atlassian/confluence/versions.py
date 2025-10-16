@@ -14,7 +14,7 @@ logger = logging.getLogger("mcp-atlassian")
 class VersionsMixin(ConfluenceClient):
     """Mixin for Confluence page version operations."""
 
-    def get_page_versions(
+    def get_page_version_history(
         self, page_id: str, start: int = 0, limit: int = 25
     ) -> Optional[Dict[str, Any]]:
         """

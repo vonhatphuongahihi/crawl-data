@@ -972,7 +972,7 @@ async def get_page_versions(
     """
     confluence_fetcher = await get_confluence_fetcher(ctx)
     try:
-        versions = confluence_fetcher.get_page_versions(page_id, start, limit)
+        versions = confluence_fetcher.get_page_version_history(page_id, start, limit)
         return json.dumps(versions, indent=2, ensure_ascii=False)
     except Exception as e:
         logger.error(f"Error getting page versions for {page_id}: {e}")

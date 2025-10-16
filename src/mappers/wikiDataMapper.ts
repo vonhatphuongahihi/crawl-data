@@ -137,7 +137,7 @@ export class WikiDataMapper {
             last_modified_by: wikiPage.version?.by?.displayName || '',
             last_modified_by_key: wikiPage.version?.by?.userKey || wikiPage.version?.by?.accountId || null, // Add user key
             created_by_display_name: wikiPage.author?.displayName || '', // Add creator display name
-            created_by_key: wikiPage.author?.userKey || wikiPage.author?.accountId || null, // Add creator user key
+            created_by_key: wikiPage.author?.username || wikiPage.author?.userKey || wikiPage.author?.accountId || null, // Use username for created_by_key
             number_of_versions: wikiPage.version?.number || 1,
             parent_page_ids: parentPageIds, // Now populated from ancestors
             created_by_id: createdById || null,
@@ -210,10 +210,10 @@ export class WikiDataMapper {
 
         // Extract author safely - try author first, then version.by
         let authorKey: string | null = null;
-        if (wikiComment.author?.userKey) {
-            authorKey = wikiComment.author.userKey;
-        } else if (wikiComment.author?.accountId) {
-            authorKey = wikiComment.author.accountId;
+        if (wikiComment.author?.user_key) {  // Fix: use correct field name
+            authorKey = wikiComment.author.user_key;
+        } else if (wikiComment.author?.account_id) {  // Fix: use correct field name
+            authorKey = wikiComment.author.account_id;
         } else if (wikiComment.version?.by?.userKey) {
             authorKey = wikiComment.version.by.userKey;
         } else if (wikiComment.version?.by?.accountId) {
@@ -224,32 +224,59 @@ export class WikiDataMapper {
         let createdAt: Date | null = null;
         let updatedAt: Date | null = null;
 
-        if (wikiComment.created) {
-            createdAt = new Date(wikiComment.created);
+        // Try to parse timestamps, with fallback to current time if empty
+        if (wikiComment.created && wikiComment.created.trim() !== '') {
+            try {
+                createdAt = new Date(wikiComment.created);
+            } catch (e) {
+                console.warn(`Failed to parse created timestamp: ${wikiComment.created}`);
+            }
         } else if (wikiComment.version?.when) {
-            createdAt = new Date(wikiComment.version.when);
+            try {
+                createdAt = new Date(wikiComment.version.when);
+            } catch (e) {
+                console.warn(`Failed to parse version.when timestamp: ${wikiComment.version.when}`);
+            }
         }
 
-        if (wikiComment.updated) {
-            updatedAt = new Date(wikiComment.updated);
+        if (wikiComment.updated && wikiComment.updated.trim() !== '') {
+            try {
+                updatedAt = new Date(wikiComment.updated);
+            } catch (e) {
+                console.warn(`Failed to parse updated timestamp: ${wikiComment.updated}`);
+            }
         } else if (wikiComment.version?.when) {
-            updatedAt = new Date(wikiComment.version.when);
+            try {
+                updatedAt = new Date(wikiComment.version.when);
+            } catch (e) {
+                console.warn(`Failed to parse version.when timestamp: ${wikiComment.version.when}`);
+            }
+        }
+
+        // Fallback: if no timestamps available, use current time
+        if (!createdAt) {
+            createdAt = new Date();
+            console.warn(`No valid created timestamp found for comment ${wikiComment.id}, using current time`);
+        }
+        if (!updatedAt) {
+            updatedAt = new Date();
+            console.warn(`No valid updated timestamp found for comment ${wikiComment.id}, using current time`);
         }
 
         // Extract username for assignee_code
         let assigneeCode: string | null = null;
         if (wikiComment.author?.username) {
             assigneeCode = wikiComment.author.username; // username goes to assignee_code
-        } else if (wikiComment.author?.userKey) {
-            assigneeCode = wikiComment.author.userKey;
-        } else if (wikiComment.author?.accountId) {
-            assigneeCode = wikiComment.author.accountId;
+        } else if (wikiComment.author?.user_key) {  // Fix: use correct field name
+            assigneeCode = wikiComment.author.user_key;
+        } else if (wikiComment.author?.account_id) {  // Fix: use correct field name
+            assigneeCode = wikiComment.author.account_id;
         } else if (authorKey) {
             assigneeCode = authorKey;
         }
 
         // Extract display_name from author
-        const displayName = wikiComment.author?.displayName || null;
+        const displayName = wikiComment.author?.display_name || null;  // Fix: use correct field name
 
         return {
             comment_id: wikiComment.id,

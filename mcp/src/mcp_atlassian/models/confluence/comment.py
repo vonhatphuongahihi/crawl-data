@@ -61,12 +61,21 @@ class ConfluenceComment(ApiModel, TimestampMixin):
         if not title and container:
             title = container.get("title")
 
+        # Extract timestamps - try direct fields first, then version
+        created = data.get("created", EMPTY_STRING)
+        updated = data.get("updated", EMPTY_STRING)
+        
+        # If timestamps are empty, try to get from version
+        if not created and version_data := data.get("version"):
+            created = version_data.get("when", EMPTY_STRING)
+            updated = version_data.get("when", EMPTY_STRING)
+
         return cls(
             id=str(data.get("id", CONFLUENCE_DEFAULT_ID)),
             title=title,
             body=data.get("body", {}).get("view", {}).get("value", EMPTY_STRING),
-            created=data.get("created", EMPTY_STRING),
-            updated=data.get("updated", EMPTY_STRING),
+            created=created,
+            updated=updated,
             author=author,
             type=data.get("type", "comment"),
         )
@@ -76,8 +85,8 @@ class ConfluenceComment(ApiModel, TimestampMixin):
         result = {
             "id": self.id,
             "body": self.body,
-            "created": self.format_timestamp(self.created),
-            "updated": self.format_timestamp(self.updated),
+            "created": self.created if self.created else self.format_timestamp(self.created),
+            "updated": self.updated if self.updated else self.format_timestamp(self.updated),
         }
 
         if self.title:
